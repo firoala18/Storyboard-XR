@@ -1,0 +1,132 @@
+﻿@page
+@model TwoFactorAuthenticationModel
+@using Microsoft.AspNetCore.Http.Features
+@{
+    ViewData["Title"] = "Zwei-Faktor-Authentifizierung";
+    ViewData["ActivePage"] = ManageNavPages.TwoFactorAuthentication;
+}
+<partial name="_StatusMessage" for="StatusMessage" />
+
+<style>
+    /* Wiederverwendbare Kartendetails */
+    .card-detail {
+        border-radius: 0.8rem;
+        box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+        .card-detail .card-header {
+            background: #191919;
+            color: #fff;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .card-detail .btn-lg {
+            background: #151717;
+            color: #fff;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            font-size: 0.95rem;
+            transition: filter .15s;
+        }
+
+            .card-detail .btn-lg:hover {
+                filter: brightness(1.1);
+            }
+
+        .card-detail .d-grid > .btn + .btn {
+            margin-top: 0.75rem;
+        }
+
+        .card-detail .d-grid {
+            justify-items: center; /* horizontal centering */
+            row-gap: .75rem; /* replaces your margin-top rule */
+        }
+</style>
+
+<div class="container py-5">
+    <div class="card card-detail mx-auto" style="max-width: 600px;">
+        <div class="card-header">
+            <h4 class="mb-0">@ViewData["Title"]</h4>
+        </div>
+        <div class="card-body">
+            @{
+                var consentFeature = HttpContext.Features.Get<ITrackingConsentFeature>();
+            }
+            @if (!(consentFeature?.CanTrack ?? true))
+            {
+                <div class="alert alert-danger">
+                    <strong>Datenschutzbestimmungen nicht akzeptiert.</strong>
+                    <p>Sie müssen die Cookie- und Datenschutzbestimmungen akzeptieren, um 2FA zu verwenden.</p>
+                </div>
+            }
+            else
+            {
+                @if (Model.Is2faEnabled)
+                {
+                    @* Warnungen zu verbleibenden Wiederherstellungscodes *@
+                    @if (Model.RecoveryCodesLeft == 0)
+                    {
+                        <div class="alert alert-danger">
+                            <strong>Keine Wiederherstellungscodes mehr verfügbar.</strong>
+                            <p>Bitte <a asp-page="./GenerateRecoveryCodes">neue Codes generieren</a>, um sich wieder mit einem Code anzumelden.</p>
+                        </div>
+                    }
+                    else if (Model.RecoveryCodesLeft == 1)
+                    {
+                        <div class="alert alert-danger">
+                            <strong>Noch 1 Wiederherstellungscode übrig.</strong>
+                            <p>Sie können <a asp-page="./GenerateRecoveryCodes">neue Codes generieren</a>.</p>
+                        </div>
+                    }
+                    else if (Model.RecoveryCodesLeft <= 3)
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Noch @Model.RecoveryCodesLeft Codes übrig.</strong>
+                            <p>Sie sollten <a asp-page="./GenerateRecoveryCodes">neue Codes generieren</a>.</p>
+                        </div>
+                    }
+
+                    @* Aktionen bei aktivierter 2FA *@
+                    <div class="d-flex flex-column align-items-center gap-3">
+                     
+
+                        <a asp-page="./Disable2fa" class="btn btn-lg">2FA deaktivieren</a>
+
+                        @if (Model.IsMachineRemembered)
+                        {
+                            <form method="post" asp-page-handler="ForgetBrowser">
+                                <button type="submit" class="btn btn-lg">Diesen Browser vergessen</button>
+                            </form>
+                        }
+                    </div>
+                }
+
+    if (!Model.Is2faEnabled)
+    {
+                <hr />
+
+                @* Authenticator-App Sektion *@
+                <h5>Authenticator-App</h5>
+                <div class="d-grid">
+                    @if (!Model.HasAuthenticator)
+                    {
+                        <a asp-page="./EnableAuthenticator" class="btn btn-lg">Authenticator-App hinzufügen</a>
+                    }
+                    else
+                    {
+                        <a asp-page="./EnableAuthenticator" class="btn btn-lg">Authenticator-App einrichten</a>
+                        <a asp-page="./ResetAuthenticator" class="btn btn-lg btn-outline-light text-white">Authenticator-App zurücksetzen</a>
+                    }
+                </div>
+            }
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

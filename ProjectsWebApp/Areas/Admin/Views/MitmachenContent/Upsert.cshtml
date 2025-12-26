@@ -1,0 +1,99 @@
+﻿@model MitmachenContent
+
+
+@{
+    ViewData["Title"] = "Tipps-Managment";
+}
+
+
+    
+
+<div class="container mt-5">
+    <h2>@(Model.Id == 0 ? "Tipps Inhalt hinzufügen" : "Tipps Inhalt bearbeiten")</h2>
+
+    <div class="d-flex justify-content-end mt-3 gap-2 flex-wrap mb-3">
+        <a asp-action="Index" class="btn btn-secondary">Abbrechen</a>
+        <button type="submit" class="btn  me-2" style="color:white;background:black;"> <i class="bi bi-check-lg me-1"></i> Speichern</button>
+        </div>
+      
+    <form asp-action="Upsert" method="post">
+        <input type="hidden" asp-for="Id" />
+
+        <div class="form-group">
+            <label for="SectionType" class="mt-3"><strong>Abschnittstyp</strong></label>
+            <select class="form-control" asp-for="SectionType" required
+                    disabled="@(Model.Id != 0 && Model.SectionType == "Header")">
+                @if (Model.Id == 0)
+                {
+                    <option value="">-- Abschnittstyp auswählen --</option>
+                    <option value="Card">Karte</option>
+                    <option value="Accordion">Akkordeon</option>
+                }
+                else
+                {
+                    @if (Model.SectionType == "Header")
+                    {
+                        <option value="Header" selected>Überschrift</option>
+                    }
+                    else
+                    {
+                        <option value="Card" selected="@(Model.SectionType == "Card")">Karte</option>
+                        <option value="Accordion" selected="@(Model.SectionType == "Accordion")">Akkordeon</option>
+                    }
+                }
+            </select>
+            @if (Model.Id != 0 && Model.SectionType == "Header")
+            {
+                <input type="hidden" asp-for="SectionType" />
+            }
+            <span asp-validation-for="SectionType" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mt-3">
+            <label for="Title" class="mt-3"><strong>Titel</strong></label>
+            <input type="text" class="form-control" asp-for="Title" required />
+            <span asp-validation-for="Title" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mt-3">
+            <label asp-for="Content"><strong>Inhalt</strong></label>
+            <textarea id="Content"
+                      class="form-control"
+                      asp-for="Content"
+                      rows="5"
+                      required>
+            </textarea>
+            <span asp-validation-for="Content" class="text-danger"></span>
+        </div>
+        <div class="d-flex justify-content-end mt-3 gap-2 flex-wrap mb-3">
+            <a asp-action="Index" class="btn btn-secondary">Abbrechen</a>
+            <button type="submit" class="btn  me-2" style="color:white;background:black;"> <i class="bi bi-check-lg me-1"></i> Speichern</button>
+
+            <div/>
+    </form>
+</div>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
+    <script>
+        (function(){
+          document.addEventListener('DOMContentLoaded', function(){
+            const el = document.querySelector('#Content');
+            if (!el || !window.jQuery) return;
+            window.jQuery(el).summernote({
+              height: 350,
+              placeholder: 'Inhalt eingeben …',
+              toolbar: [
+                ['style', ['bold', 'italic', 'underline', 'clear']],
+                ['font', ['fontsize', 'color']],
+                ['para', ['ul', 'ol', 'paragraph']],
+                ['insert', ['picture', 'video', 'link']],
+                ['view', ['codeview']]
+              ]
+            });
+          });
+        })();
+    </script>
+}

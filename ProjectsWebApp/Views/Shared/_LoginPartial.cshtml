@@ -1,0 +1,241 @@
+﻿@using Microsoft.AspNetCore.Identity
+
+@inject SignInManager<IdentityUser> SignInManager
+@inject UserManager<IdentityUser> UserManager
+<style>
+    .drop-item:hover{
+        background:#d4d4d4;
+    }
+</style>
+
+<ul class="navbar-nav d-flex flex-row align-items-center gap-3">
+    @if (SignInManager.IsSignedIn(User))
+    {
+        var user = await UserManager.GetUserAsync(User) as AplicationUser;
+
+    
+
+        @* Für alle angemeldeten (auch Admins) zusätzlich: eigene Filter-Kategorien *@
+        @* <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle text-light d-flex align-items-center"
+               href="#" data-bs-toggle="dropdown">
+                @* <i class="fa fa-suitcase fs-4" aria-hidden="true"></i> 
+                <i class="fa fa-briefcase fs-4" aria-hidden="true"></i>
+            </a>
+            
+            <ul class="dropdown-menu dropdown-menu-end">
+                
+                <li><h6 class="dropdown-header text-center" style="color:black;font-size:16px;"><strong>Arbeitsbereich</strong></h6>
+                    <hr />
+                </li>
+                
+                <li>
+                    <a class="dropdown-item drop-item"
+                       asp-area="User"
+                       asp-controller="FilterCategory"
+                       asp-action="Index"
+                       asp-route-type="Eigenfilter">
+                        <i class="bi bi-funnel-fill fs-4"></i> Eigenfilter entwickeln
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item drop-item"
+                       asp-area="User"
+                       asp-controller="Home"
+                       asp-action="PromptAssistent"
+                       asp-route-type="Eigenfilter">
+                        <i class="bi bi-funnel-fill fs-4"></i> Eigenfilter anwenden
+                    </a>
+                </li>
+                
+                <hr />
+                <li><h6 class="dropdown-header text-center">Prompt-Arten</h6></li>
+                    <!-- Text ------------------------------------------------------->
+                    <li>
+                    <a class="dropdown-item d-flex align-items-center gap-2 drop-item"
+                           asp-area="User"
+                           asp-controller="Home"
+                           asp-action="PromptAssistent"
+                           asp-route-type="Text">
+                            <i class="bi bi-fonts"></i> Text
+                        </a>
+                    </li>
+
+                    <!-- Bild ------------------------------------------------------->
+                    <li>
+                    <a class="dropdown-item d-flex align-items-center gap-2 drop-item"
+                           asp-area="User"
+                           asp-controller="Home"
+                           asp-action="PromptAssistent"
+                           asp-route-type="Bild">
+                            <i class="bi bi-image"></i> Bild
+                        </a>
+                    </li>
+
+                    <!-- Video ------------------------------------------------------>
+                    <li>
+                    <a class="dropdown-item d-flex align-items-center gap-2 drop-item"
+                           asp-area="User"
+                           asp-controller="Home"
+                           asp-action="PromptAssistent"
+                           asp-route-type="Video">
+                            <i class="bi bi-play-btn-fill"></i> Video
+                        </a>
+                    </li>
+
+                    <!-- Sound ------------------------------------------------------>
+                    <li>
+                    <a class="dropdown-item d-flex align-items-center gap-2 drop-item"
+                           asp-area="User"
+                           asp-controller="Home"
+                           asp-action="PromptAssistent"
+                           asp-route-type="Sound">
+                            <i class="bi bi-volume-up-fill"></i> Sound
+                        </a>
+                    </li>
+
+                    <!-- Akademisch (Lehre / Lernen) -------------------------------->
+                    <li>
+                    <a class="dropdown-item d-flex align-items-center gap-2 drop-item"
+                           asp-area="User"
+                           asp-controller="Home"
+                           asp-action="PromptAssistent"
+                           asp-route-type="Akademisch">
+                            <i class="bi bi-mortarboard"></i> Akademisch
+                        </a>
+                    </li>
+
+                    <!-- Meta ------------------------------------------------------->
+                    <li>
+                    <a class="dropdown-item d-flex align-items-center gap-2 drop-item"
+                           asp-area="User"
+                           asp-controller="Home"
+                           asp-action="PromptAssistent"
+                           asp-route-type="Meta">
+                            <i class="bi bi-gear"></i> Meta
+                        </a>
+                    </li>
+
+                <hr />
+                <li>
+                    <a class="dropdown-item drop-item"
+                       asp-area="User"
+                       asp-controller="MyPrompts"
+                       asp-action="Index">
+                        <i class="bi bi-archive-fill fs-4"></i> Sammlungen
+                    </a>
+                </li>
+
+                <li>
+                    <a class="dropdown-item drop-item"
+                       asp-area="User"
+                       asp-controller="Home"
+                       asp-action="Bibliothek">
+                        <i class="fa fa-university fs-4" aria-hidden="true"></i> Bibliothek
+                    </a>
+                </li>
+
+            </ul>
+        </li>*@
+       
+        <!-- Admin Dropdown -->
+        @if (User.IsInRole(SD.Role_Admin))
+        {
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle text-light d-flex align-items-center justify-content-center"
+                   href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-gear fs-4"></i>
+                </a>
+
+                <ul class="dropdown-menu dropdown-menu-end admin-dropdown">
+         
+
+                  
+                  @*   <li><h6 class="dropdown-header">Prompt Engineering-Managment</h6></li>
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="FilterCategory" asp-action="Index"> <i class="bi bi-funnel-fill"></i> Kategorien</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">Modelle-Managment</h6></li>
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="PromptModel" asp-action="Index"> <i class="bi bi-grid me-2"></i> Modelle</a></li> *@
+
+              
+                 
+           
+
+                   @*  <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">KIBar-Managment</h6></li>
+                    <li>
+                        <a class="dropdown-item" asp-area="Admin" asp-controller="MakerSpaceProject" asp-action="Index">
+                            <i class="bi bi-tools me-2"></i> KIBar
+                        </a>
+                    </li>
+
+                    <li>
+                        <a class="dropdown-item" asp-area="Admin" asp-controller="MakerSpaceDescription" asp-action="Index">
+                            <i class="fas fa-edit me-2"></i> KIBar Beschreibung
+                        </a>
+                    </li> *@
+
+                    @* <li><hr class="dropdown-divider"></li> *@
+                    <li><h6 class="dropdown-header">Einladungscodes-Managment </h6></li>
+                    <li>
+                        <a class="dropdown-item" asp-area="Admin" asp-controller="RegistrationCodes" asp-action="Index">
+                            <i class="bi bi-tools me-2"></i> Einladungscodes
+                        </a>
+                    </li>
+
+                   
+                    <li><hr class="dropdown-divider"></li>
+
+                    <li><h6 class="dropdown-header">Inhalte-Managment</h6></li>
+                  @*   <li>
+                        <a class="dropdown-item" asp-area="Admin" asp-controller="LandingItem" asp-action="Index">
+                            <i class="bi bi-cone-striped me-2"></i> PromptEngineering
+                        </a>
+                    </li> *@
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="portalCard" asp-action="Index"><i class="fas fa-info-circle me-2"></i> Über StoryBoard </a></li>
+                    @* <li><a class="dropdown-item" asp-area="Admin" asp-controller="PromptWord" asp-action="Index"><i class="fa fa-key me-2"></i> Prompt Keys</a></li> *@
+
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="MitmachenContent" asp-action="Index"><i class="fas fa-hands-helping me-2"></i> Tipps</a></li>
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="Kontakt" asp-action="Index"><i class="fa-solid fa-users"></i> Kontakt</a></li>
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="ContactEmail" asp-action="Edit"><i class="fas fa-envelope-open-text me-2"></i> Kontakt-E-Mail</a></li>
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="LockedAccounts" asp-action="Index"><i class="fas fa-user-lock me-2"></i> Gesperrte Konten</a></li>
+                    @* <li><a class="dropdown-item" asp-area="Admin" asp-controller="ContactMessageSettings" asp-action="Edit" ><i class="fas fa-envelope-open-text me-2"></i> Kontakt-Nachricht</a></li> *@
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="Urheberrecht" asp-action="Index"><i class="fas fa-gavel me-2"></i> Urheberrecht</a></li>
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="LeichteSprache" asp-action="Edit"><i class="fas fa-universal-access me-2"></i> Leichte Sprache</a></li>
+
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="Uebersicht" asp-action="Edit"><i class="fas fa-layer-group me-2"></i> Übersicht</a></li>
+
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="ImpressumContent" asp-action="Index"><i class="fas fa-file-signature me-2"></i> Impressum</a></li>
+                    <li><a class="dropdown-item" asp-area="Admin" asp-controller="DatenschutzContent" asp-action="Index"><i class="fas fa-shield-alt me-2"></i> Datenschutz</a></li>
+
+        
+
+  
+                </ul>
+            </li>
+        }
+
+            <!-- Manage Icon -->
+        <li class="nav-item">
+            <a id="manage" class="nav-link text-light d-flex align-items-center justify-content-center"
+               asp-area="Identity" asp-page="/Account/Manage/Index" title="Profil verwalten">
+                <i class="bi bi-person-circle fs-4"></i>
+            </a>
+        </li>
+        <!-- Logout Icon -->
+        <li class="nav-item">
+            <form id="logoutForm" class="form-inline d-flex align-items-center justify-content-center"
+                  asp-area="Identity" asp-page="/Account/Logout"
+                  asp-route-returnUrl="@Url.Action("Home", "Home", new { area = "" })">
+                <button id="logout" type="submit" class="nav-link btn-link text-light border-0">
+                    <i class="bi bi-box-arrow-right fs-4"></i>
+                </button>
+            </form>
+        </li>
+    }
+</ul>
+
+  
+</ul>
+
+

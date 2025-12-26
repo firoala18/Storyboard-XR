@@ -1,0 +1,431 @@
+﻿@{
+    ViewData["Title"] = "Szene hinzufügen";
+    ViewBag.FullWidth = true;
+
+    var sb = ViewBag.Storyboard as ProjectsWebApp.Models.Storyboard;
+    var suggested = (int?)ViewBag.SuggestedNumber ?? 1;
+    var publicSlug = sb?.PublicId;
+    var isPublic = !string.IsNullOrWhiteSpace(publicSlug);
+    var plainTitle = System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(sb?.Title ?? string.Empty, "<.*?>", string.Empty)).Trim();
+}
+
+@if (sb is null)
+{
+    <div class="alert alert-danger mb-3">
+        Storyboard-Kontext fehlt. Bitte komme von der Storyboard-Detailseite oder gib eine gültige <code>storyboardId</code> an.
+    </div>
+}
+else
+{
+    <style>
+        /* =========================
+                   Styling Role Tokens (Green)
+                   ========================= */
+        :root {
+            /* base */
+            --role-bg: #f9fafc;
+            --role-surface: #ffffff;
+            --role-border: #e6e8ef;
+            --role-soft: #f5f7fb;
+            --role-text: #111827;
+            --role-muted: #6b7280;
+            /* primary (green family to match Storyboards) */
+            --role-primary-400: #9fd62a;
+            --role-primary: #89ba17; /* main */
+            --role-primary-600: #77a514;
+            --role-primary-700: #6a9312;
+            --role-primary-contrast: #ffffff;
+            /* chips */
+            --role-chip-bg: rgba(137,186,23,.12);
+            --role-chip-border: rgba(137,186,23,.25);
+            --role-chip-text: var(--role-primary-700);
+            /* shadows */
+            --role-shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+            --role-shadow-md: 0 6px 18px rgba(16,24,40,.06);
+            --role-shadow-lg: 0 10px 20px rgba(16,24,40,.10);
+        }
+
+        body {
+            background: var(--role-bg);
+        }
+
+        /* -------- Layout -------- */
+        .page-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 8px 0 20px;
+        }
+
+            .page-head h2 {
+                font-size: 1.9rem;
+                margin: 0;
+                color: var(--role-text);
+                letter-spacing: -.015em;
+            }
+
+        .scene-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* full width form; preview collapses below */
+            gap: 22px;
+        }
+
+        @@media (max-width:900px) {
+            .scene-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* -------- Cards -------- */
+        .card {
+            background: var(--role-surface);
+            border: 1px solid var(--role-border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: var(--role-shadow-md);
+        }
+
+        .card-title {
+            font-weight: 700;
+            margin: 0 0 12px;
+            color: var(--role-text);
+        }
+
+        /* -------- Form fields -------- */
+        .field {
+            margin-bottom: 14px;
+        }
+
+            .field label {
+                font-weight: 600;
+                margin-bottom: 6px;
+                display: block;
+                color: var(--role-text);
+            }
+
+        .text-muted {
+            color: var(--role-muted);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        @@media (max-width:700px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-control,
+        input[type="text"], input[type="number"], input[type="file"], textarea, select {
+            background: #ffffff !important;
+            color: #111 !important;
+            border: 1px solid #cfd6e4 !important;
+            border-radius: 10px !important;
+            padding: 10px 12px !important;
+            min-height: 44px;
+        }
+
+            .form-control:focus, input:focus, textarea:focus, select:focus {
+                border-color: var(--role-primary) !important;
+                box-shadow: 0 0 0 .2rem rgba(137,186,23,.25) !important;
+                outline: none !important;
+            }
+
+        /* -------- Buttons -------- */
+        .btn {
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-weight: 700;
+            text-decoration: none !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--role-primary);
+            border: 1px solid var(--role-primary-600);
+            color: var(--role-primary-contrast);
+            box-shadow: var(--role-shadow-sm);
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+
+            .btn-primary:hover {
+                background: var(--role-primary-600);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 10px rgba(137,186,23,.25);
+            }
+
+        .btn-secondary {
+            background: #fff;
+            border: 1px solid rgba(137,186,23,.35);
+            color: var(--role-primary-700);
+            transition: background .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+
+            .btn-secondary:hover {
+                background: rgba(137,186,23,.08);
+                transform: translateY(-1px);
+                color: #89ba17;        box-shadow: var(--role-shadow-sm);
+            }
+
+        /* -------- Mini inline preview (compact) -------- */
+        .mini-preview {
+            display: none; /* shown only after image selection */
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 8px 10px;
+            border: 1px solid var(--role-border);
+            border-radius: 10px;
+            background: var(--role-soft);
+        }
+        .mini-preview .mini-thumb img {
+            width: 160px;
+            height: 90px;
+            object-fit: contain;
+            background: #f0f3f9;
+            border-radius: 6px;
+            display: block;
+        }
+        .mini-preview .mini-meta {
+            font-weight: 600;
+            color: var(--role-text);
+        }
+
+        .sb-card {
+            background: var(--role-surface);
+            border: 1px solid var(--role-border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: var(--role-shadow-md);
+            display: grid;
+            grid-template-rows: auto 1fr;
+        }
+
+        /* Collapsible preview affordance */
+        .preview-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            font-size: .9rem;
+            border-radius: 999px;
+        }
+        .preview-shell {
+            overflow: hidden;
+            transition: max-height .28s ease, opacity .2s ease, transform .18s ease;
+            will-change: max-height, opacity, transform;
+        }
+
+        .sb-thumb {
+            background: var(--role-soft);
+            border-bottom: 1px solid #eef1f6;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .sb-thumb img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                display: block;
+            }
+
+        .sb-main {
+            padding: 14px 16px 16px;
+            display: grid;
+            grid-template-rows: 32px 28px 1fr 52px;
+            row-gap: 8px;
+        }
+
+        .sb-title {
+            font-weight: 700;
+            color: var(--role-text);
+            letter-spacing: .2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            align-self: center;
+        }
+
+        .sb-chips {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .sb-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            background: var(--role-chip-bg);
+            color: var(--role-chip-text);
+            border: 1px solid var(--role-chip-border);
+            font-size: .9rem;
+        }
+
+            .sb-chip .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--role-primary);
+                display: inline-block;
+                box-shadow: 0 0 0 2px var(--role-chip-border);
+            }
+
+            .sb-chip.muted {
+                background: rgba(137,186,23,.08);
+                color: var(--role-primary-700);
+                border-color: rgba(137,186,23,.2);
+            }
+
+        .sb-footer {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            align-self: end;
+        }
+    </style>
+
+    <div class="page-head">
+        <h2>Szene zu „@plainTitle“ hinzufügen</h2>
+        @if (isPublic)
+        {
+            <a href="@Url.Action("OpenBySlug", "PublicStoryboards", new { area = "User", slug = publicSlug })" class="btn btn-secondary">Zur Übersicht</a>
+        }
+        else
+        {
+            <a asp-controller="Storyboards" asp-action="Details" asp-route-id="@sb.Id" class="btn btn-secondary">Zur Übersicht</a>
+        }
+    </div>
+
+    <form action="@Url.Action("Create", "Scenes", new { area = "User" })" method="post" enctype="multipart/form-data" class="scene-grid">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="storyboardId" value="@sb.Id" />
+
+        <!-- LEFT: form -->
+        <div>
+            <div class="card">
+                <h4 class="card-title">Szenen-Details</h4>
+
+                <div class="form-row">
+                    <div class="field">
+                        <label for="number">Nummer</label>
+                        <input id="number" name="number" type="number" min="1" step="1" value="@suggested" class="form-control" />
+                    </div>
+                    <div class="field">
+                        <label for="name">Name (optional)</label>
+                        <input id="name" name="name" class="form-control" placeholder="1. Szene / Intro" />
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="image">Bild <span class="text-danger">*</span></label>
+                    <input id="image" type="file" name="image" class="form-control" accept=".png,.jpg,.jpeg,.webp,.gif" required />
+                    <small class="text-muted">Dieses Bild wird als Szenenbild verwendet.</small>
+                    <!-- Compact Vorschau shown after image selection -->
+                    <div id="miniPreview" class="mini-preview">
+                        <div class="mini-thumb">
+                            <img id="pvImg" alt="Vorschau" src="data:image/svg+xml;utf8,
+                        <svg xmlns='http://www.w3.org/2000/svg' width='160' height='90'>
+                            <rect width='100%%' height='100%%' fill='%23f0f3f9' />
+                            <text x='50%%' y='50%%' text-anchor='middle' dominant-baseline='middle'
+                                  font-family='Segoe UI, Roboto, system-ui' font-size='16' fill='%238a94a7'>Vorschau</text>
+                        </svg>" />
+                        </div>
+                        <div class="mini-meta">
+                            <span id="pvTitle">@suggested. Szene</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:10px;margin-top:6px">
+                    <button class="btn btn-primary" type="submit">Anlegen</button>
+                    @if (isPublic)
+                    {
+                        <a href="@Url.Action("OpenBySlug", "PublicStoryboards", new { area = "User", slug = publicSlug })" class="btn btn-secondary">Abbrechen</a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Storyboards" asp-action="Details" asp-route-id="@sb.Id" class="btn btn-secondary">Abbrechen</a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Removed large full-width preview; mini inline preview lives under the image input. -->
+    </form>
+
+    @section Scripts {
+        <script>
+            (function () {
+                const $ = (s) => document.querySelector(s);
+
+                const numIn  = $('#number');
+                const nameIn = $('#name');
+                const imgIn  = $('#image');
+
+                const pvTitle = $('#pvTitle');
+                const pvImg   = $('#pvImg');
+                const mini    = document.getElementById('miniPreview');
+
+                function updateTitle(){
+                    const n = Math.max(1, parseInt(numIn?.value || '1', 10));
+                    const name = (nameIn?.value || '').trim();
+                    pvTitle.textContent = name ? `${n}. ${name}` : `${n}. Szene`;
+                }
+
+                numIn?.addEventListener('input', updateTitle);
+                nameIn?.addEventListener('input', updateTitle);
+                updateTitle();
+
+                imgIn?.addEventListener('change', () => {
+                    const f = imgIn.files && imgIn.files[0];
+                    if (!f) {
+                        if (mini) mini.style.display = 'none';
+                        if (pvImg) pvImg.src = '';
+                        return;
+                    }
+
+                    const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+                    if (f.size > MAX_SIZE) {
+                        const msg = 'Das Bild ist zu groß. Maximal 2 MB pro Bild erlaubt.';
+                        if (window.SB && SB.alert) SB.alert(msg, 'error', 'Bild zu groß');
+                        else if (window.Swal) Swal.fire({ icon: 'error', title: 'Bild zu groß', text: msg });
+                        else alert(msg);
+                        imgIn.value = '';
+                        if (mini) mini.style.display = 'none';
+                        return;
+                    }
+
+                    if (!/\.(png|jpe?g|webp|gif)$/i.test(f.name)){
+                        if (window.SB && SB.alert) SB.alert('Nur PNG/JPG/WebP/GIF erlaubt.', 'error', 'Ungültige Datei');
+                        else alert('Nur PNG/JPG/WebP/GIF erlaubt.');
+                        imgIn.value = '';
+                        if (mini) mini.style.display = 'none';
+                        return;
+                    }
+
+                    const r = new FileReader();
+                    r.onload = e => {
+                        if (pvImg) pvImg.src = e.target.result;
+                        if (mini) mini.style.display = 'flex';
+                    };
+                    r.readAsDataURL(f);
+                });
+            })();
+        </script>
+    }
+}

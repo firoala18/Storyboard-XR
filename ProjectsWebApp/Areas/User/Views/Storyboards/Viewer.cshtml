@@ -1,0 +1,2377 @@
+@model ProjectsWebApp.Models.Storyboard
+@using ProjectsWebApp.Models
+@{
+    ViewData["Title"] = "Storyboard ansehen";
+    ViewBag.FullWidth = true;
+    var coverPath = !string.IsNullOrWhiteSpace(Model.CoverImagePath) ? Model.CoverImagePath : Model.ImagePath;
+    var scenes = (Model.Scenes ?? new List<Scene>())
+        .Where(s => string.IsNullOrWhiteSpace(coverPath) || !string.Equals(s.ImagePath, coverPath, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(s => s.Number)
+        .ThenBy(s => s.Id)
+        .ToList();
+
+    var activeId = (int?)ViewBag.ActiveSceneId ?? (scenes.FirstOrDefault()?.Id ?? 0);
+    var activeScene = scenes.FirstOrDefault(s => s.Id == activeId) ?? scenes.FirstOrDefault();
+
+    var basePath = Context.Request.PathBase.HasValue ? Context.Request.PathBase.Value : "";
+    var publicSlug = ViewData["PublicSlug"] as string;
+
+    string PlaceholderSvg(string text) =>
+        "data:image/svg+xml;utf8," +
+        $"<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='675'><rect width='100%25' height='100%25' fill='%23f5f7fb'/>" +
+        $"<text x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Segoe UI, Roboto, system-ui' font-size='28' fill='%238a94a7'>{text}</text></svg>";
+    var placeholder = PlaceholderSvg("Kein Bild");
+
+    // palette data attribute value
+    var paletteAttr = Model.Farbpalette ?? "";
+
+    var isAuthenticated = User?.Identity?.IsAuthenticated ?? false;
+    var backHref = (!string.IsNullOrWhiteSpace(publicSlug) || !isAuthenticated)
+        ? (basePath + "/s/my")
+        : Url.Action("Index", "Storyboards", new { area = "User" });
+}
+<style>
+    /* ===== Design tokens (neutrals) ===== */
+    :root {
+        --ink: #111827;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --bg: #f9fafc;
+        /* ===== Color Role Schema (defaults; overridden via JS from Farbpalette) ===== */
+        --role-primary-400: #9fd62a; /* nice defaults that match the app */
+        --role-primary-500: #89ba17;
+        --role-primary-600: #77a514;
+        --role-primary-700: #6a9312;
+
+        --role-on-primary: #ffffff; /* text on primary */
+        --role-chip-bg: rgba(137,186,23,.12);
+        --role-chip-border: rgba(137,186,23,.25);
+        --role-chip-muted-bg: rgba(137,186,23,.08);
+        --role-chip-muted-border: rgba(137,186,23,.20);
+        --role-shadow: 0 10px 15px -3px rgba(0,0,0,.08),0 4px 6px -2px rgba(0,0,0,.02);
+    }
+
+    .richtext { line-height: 1.6; }
+    .richtext p { margin: 0 0 .5rem; }
+    .richtext ul, .richtext ol { margin: .5rem 0; padding-left: 1.25rem; }
+    .richtext li { margin: .25rem 0; }
+    /* Links inside meta/content use fixed uni green like Details view */
+    .richtext a { color: #6a9312; text-decoration: underline; }
+    .richtext blockquote { margin: .6rem 0; padding-left: .75rem; border-left: 3px solid #e5e7eb; color: #374151; }
+
+    /* Global */
+    body {
+        background: var(--bg);
+        font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+        line-height: 1.5;
+        color: #374151;
+    }
+
+    /* Header */
+    .viewer-head {
+        display: grid;
+        gap: 16px;
+        align-content: start;
+        margin: 0 0 24px;
+        padding: 16px 0;
+    }
+
+    .viewer-title {
+        /* responsive sizing and improved readability */
+        font-size: clamp(1.5rem, 1.1rem + 2.2vw, 2.2rem);
+        font-weight: 700;
+        line-height: 1.25;
+        margin: 0;
+        color: var(--ink);
+        letter-spacing: -.02em;
+        text-wrap: balance;
+        /* limit to a comfortable measure and clamp lines */
+        max-width: 60ch;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Meta grid (match Allgemeine Informationen style) */
+    .viewer-meta {
+        margin-top: 8px;
+    }
+
+    /* Meta accordion */
+    .viewer-meta-acc {
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        background: #ffffff;
+        box-shadow: 0 8px 20px rgba(15,23,42,.06);
+        overflow: hidden;
+    }
+
+        .viewer-meta-acc summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            user-select: none;
+        }
+
+        .viewer-meta-acc summary::-webkit-details-marker { display:none; }
+
+        .viewer-meta-acc .viewer-meta-title {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 1rem;
+        }
+
+        .viewer-meta-caret {
+            width: 1.6em;
+            height: 1.6em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1;
+            font-size: 2rem;
+            color: #4b5563;
+        }
+
+        .viewer-meta-caret::before { content: "▸"; }
+        .viewer-meta-acc[open] .viewer-meta-caret::before { content: "▾"; }
+
+        .viewer-meta-acc .acc-body {
+            padding: 12px 16px 14px;
+            background: #ffffff;
+        }
+
+    .viewer-meta-grid {
+        display: grid;
+        grid-template-columns: 1fr; /* stack items under each other: Zielgruppe then Lernziel, etc. */
+        gap: 14px;
+        margin-top: 8px;
+    }
+
+        .viewer-meta-grid .item {
+            padding: 8px 0;
+            border-top: 1px solid #eef1f6;
+        }
+
+        .viewer-meta-grid .item.full {
+            grid-column: 1 / -1;
+        }
+
+        .viewer-meta-grid .item:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+
+        .viewer-meta-grid label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 1.05rem; /* larger labels for better readability */
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .viewer-meta-grid .val {
+            font-size: 1rem;
+            color: #111827;
+        }
+
+    .viewer-taxo {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+        .viewer-taxo .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: .9rem;
+            background: rgba(137,186,23,.12); /* uni green, not palette blue */
+            color: #6a9312;
+            border: 1px solid rgba(137,186,23,.25);
+        }
+
+        .viewer-taxo .chip.active {
+            background: #89ba17; /* uni green 500 */
+            color: #fff;
+            border-color: #89ba17;
+        }
+
+    .viewer-palette {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+    }
+
+        .viewer-palette .swatch-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 52px;
+        }
+
+        .viewer-palette .swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid rgba(0,0,0,.15);
+        }
+
+        .viewer-palette .swatch-hex {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: .8rem;
+            color: #374151;
+            line-height: 1;
+            letter-spacing: .02em;
+        }
+
+    /* Chips */
+    .meta-chips {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: .92rem;
+        background: var(--role-chip-bg);
+        color: var(--role-primary-700);
+        border: 1px solid var(--role-chip-border);
+        box-shadow: 0 1px 2px rgba(16,24,40,.05);
+    }
+
+        .meta-chip.muted {
+            background: var(--role-chip-muted-bg);
+            color: #030303;
+            border-color: var(--role-chip-muted-border);
+        }
+
+    .meta-bubble {
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: var(--role-chip-bg);
+        color: var(--role-primary-700);
+        border: 1px solid var(--role-chip-border);
+        box-shadow: 0 1px 2px rgba(16,24,40,.05);
+    }
+
+    /* Rectangular emphasis bubble variant */
+    .meta-bubble.rect {
+        border-radius: 10px;
+        background: var(--role-chip-muted-bg);
+        color: black;
+        border-color: var(--role-chip-muted-border);
+    }
+    .meta-bubble.rect a { color: var(--role-primary-700); text-decoration: underline; }
+
+        .meta-chip .sw {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,0,0,.14);
+            box-shadow: 0 1px 2px rgba(0,0,0,.05);
+        }
+
+    /* Palette layout: swatch above hex */
+    .meta-chip .pal { display: inline-flex; gap: 10px; align-items: flex-start; margin-left: 6px; }
+    .meta-chip .swatch-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-width: 36px; }
+    .meta-chip .sw-hex { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; font-size: .72rem; color: #475569; line-height: 1; }
+
+    /* Toolbar */
+    .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        width: 100%;
+        padding: 12px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    /* Simple dropdown */
+    .dd { position: relative; display: inline-block; }
+    .dd .menu {
+        position: absolute;
+        right: 0; top: calc(100% + 6px);
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        box-shadow: 0 8px 20px rgba(0,0,0,.08);
+        min-width: 240px;
+        display: none;
+        z-index: 1000;
+        overflow: hidden;
+    }
+    .dd.open .menu { display: block; }
+    .dd .menu .menu-item {
+        display: block; width: 100%; text-align: left;
+        padding: 10px 14px; background: #fff; border: 0; cursor: pointer; font-weight: 600; color: #334155;
+    }
+    .dd .menu .menu-item:hover { background: #f8fafc; }
+
+    .tb-btn {
+        --h: 40px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 0 14px;
+        height: var(--h);
+        min-width: var(--h);
+        font-weight: 600;
+        color: #4b5563;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all .2s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+
+        .tb-btn:hover {
+            background: #f9fafb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0,0,0,.05);
+        }
+
+        .tb-btn:active {
+            transform: translateY(0);
+        }
+
+        .tb-btn.active {
+            background: color-mix(in srgb, var(--role-primary-500) 12%, #fff);
+            border-color: color-mix(in srgb, var(--role-primary-500) 35%, #e5e7eb);
+            color: var(--role-primary-700);
+        }
+
+    .sep {
+        width: 1px;
+        height: 28px;
+        background: #e5e7eb;
+        margin: 0 4px;
+    }
+
+    .mono {
+        font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+        font-size: .9rem;
+    }
+
+    /* Layout cards */
+    .viewer-stack {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+
+    .stage-card, .panel-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,.05),0 2px 4px -1px rgba(0,0,0,.03);
+        padding: 20px;
+        transition: box-shadow .2s ease, transform .15s ease;
+        position: relative;
+    }
+
+        .stage-card:hover, .panel-card:hover {
+            box-shadow: var(--role-shadow);
+        }
+
+    .panel-card {
+        word-wrap: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    .panel-card.floating {
+        position: fixed;
+        width: min(420px, 94vw);
+        max-height: calc(100vh - 32px);
+        z-index: 60;
+        cursor: default;
+        display: flex;
+        flex-direction: column;
+        transition: box-shadow .18s ease, transform .18s ease, left .08s ease-out, top .08s ease-out;
+    }
+
+    .panel-card.floating .marker-list {
+        flex: 1;
+        max-height: none;
+        min-height: 0;
+    }
+
+    .panel-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+        cursor: grab;
+        user-select: none;
+    }
+
+    .panel-card.floating.dragging {
+        cursor: grabbing;
+        box-shadow: 0 18px 45px rgba(15,23,42,.25);
+        transform: translateY(-1px);
+    }
+
+    .panel-card.floating .panel-resizer {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        width: 16px;
+        height: 16px;
+        cursor: nwse-resize;
+        border-bottom-right-radius: 12px;
+    }
+
+    .panel-card.floating .panel-resizer::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, transparent 0, transparent 40%, #d1d5db 40%, #d1d5db 60%, transparent 60%, transparent 100%);
+        opacity: .9;
+        border-bottom-right-radius: 12px;
+        pointer-events: none;
+    }
+
+    .panel-float-btn {
+        border: none;
+        background: #f3f4f6;
+        border-radius: 999px;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #4b5563;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(15,23,42,.12);
+        transition: background .15s ease, transform .12s ease, box-shadow .15s ease, color .15s ease;
+    }
+
+        .panel-float-btn:hover {
+            background: rgba(137,186,23,.1);
+            color: #6a9312;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(15,23,42,.16);
+        }
+
+        .panel-card.floating .panel-float-btn {
+            background: #111827;
+            color: #f9fafb;
+        }
+
+    /* Stage */
+    .stage-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .stage-title {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: var(--ink);
+        margin: 0;
+    }
+
+    .stage-sub {
+        color: #6b7280;
+        font-size: .9rem;
+        margin-top: 4px;
+    }
+
+    .viewport {
+        width: 100%;
+        height: auto; /* match content height */
+        min-height: unset; /* no enforced min height */
+        overflow: auto; /* scroll when zoomed in */
+        border: 1px solid #f3f4f6;
+        border-radius: 12px;
+        background: #f9fafb;
+        position: relative;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,.03);
+    }
+
+    .zoom-wrap {
+        transform-origin: 0 0;
+        display: inline-block;
+        transition: transform .2s ease;
+    }
+
+    .board {
+        position: relative;
+        display: inline-block;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #f3f4f6;
+        background: #fff;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,.05);
+    }
+
+        .board img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            image-rendering: auto;
+        }
+
+    .overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+    }
+
+    /* Markers */
+    .dot-wrap {
+        position: absolute;
+        transform: translate(-50%,-50%);
+        pointer-events: auto;
+        transition: transform .2s ease;
+    }
+
+        .dot-wrap:hover {
+            transform: translate(-50%,-50%) scale(1.1);
+            z-index: 2;
+        }
+
+    .marker-dot {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        background: var(--c, #4a86e8);
+        border: 2px solid #fff;
+        outline: 1px solid rgba(0,0,0,.2);
+        box-shadow: 0 1px 2px rgba(0,0,0,.15);
+    }
+        /* numbers-only look */
+        .marker-dot.selected {
+            box-shadow: 0 0 0 6px rgba(74,134,232,.25);
+            outline-width: 3px;
+        }
+
+    .num-badge {
+        margin-left: 6px;
+        padding: 2px 8px;
+        font: 700 12px/16px system-ui,Segoe UI,Roboto;
+        border-radius: 10px;
+        color: #fff;
+        background: var(--role-primary-600);
+        border: 1px solid rgba(0,0,0,.15);
+        pointer-events: auto;
+        box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    }
+
+    .ping {
+        position: absolute;
+        inset: -10px;
+        border-radius: 999px;
+        border: 2px solid var(--c);
+        opacity: .45;
+        animation: ping 1.2s cubic-bezier(.2,0,.2,1) 1;
+    }
+
+    @@keyframes ping {
+        0% {
+            transform: scale(.3);
+            opacity: .5;
+        }
+
+        100% {
+            transform: scale(1.6);
+            opacity: 0;
+        }
+    }
+
+    /* Panel */
+    .panel-title {
+        font-weight: 700;
+        font-size: 1.2rem;
+        margin: 0 0 16px;
+        color: var(--ink);
+    }
+
+    .scenes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill,minmax(200px,1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    .scene-item {
+        border: 1px solid #f3f4f6;
+        border-radius: 12px;
+        overflow: hidden;
+        cursor: pointer;
+        background: #f9fafb;
+        transition: all .2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+
+        .scene-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--role-shadow);
+            border-color: #e5e7eb;
+        }
+
+        .scene-item.active {
+            outline: 2px solid var(--role-primary-500);
+            border-color: transparent;
+        }
+
+    .scene-thumb {
+        aspect-ratio: 16/9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f5f7fb;
+    }
+
+        .scene-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform .3s ease;
+        }
+
+    .scene-item:hover .scene-thumb img {
+        transform: scale(1.05);
+    }
+
+    .scene-caption {
+        font-weight: 600;
+        font-size: .92rem;
+        padding: 10px;
+        color: var(--ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: #fff;
+    }
+
+    .tools-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 20px 0 16px;
+        flex-wrap: wrap;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: #4b5563;
+        cursor: pointer;
+    }
+
+        .switch input {
+            transform: scale(1.1);
+            accent-color: var(--role-primary-500);
+        }
+
+    .sel-info {
+        font-size: .9rem;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .search {
+        display: flex;
+        gap: 10px;
+        margin: 16px 0;
+    }
+
+    .toolbar .push {
+        margin-left: auto;
+    }
+
+        .search input {
+            flex: 1;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: .9rem;
+            transition: all .2s ease;
+            background: #f1f1f1;
+            color: var(--ink);
+        }
+
+            .search input:focus {
+                outline: none;
+                border-color: var(--role-primary-500);
+            }
+
+    .marker-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+        max-height: 40vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+    }
+
+        .marker-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .marker-list::-webkit-scrollbar-track {
+            background: #f9fafb;
+            border-radius: 3px;
+        }
+
+        .marker-list::-webkit-scrollbar-thumb {
+            background: #e5e7eb;
+            border-radius: 3px;
+        }
+
+    .mcard {
+        border: 1px solid #f3f4f6;
+        margin-top: 9px;
+        border-radius: 12px;
+        padding: 14px;
+        background: #f9fafb;
+        transition: all .2s ease;
+        cursor: pointer;
+    }
+
+        .mcard:hover {
+            background: #fff;
+            border-color: #e5e7eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,.05);
+        }
+
+        .mcard.active {
+            border-color: var(--role-primary-500);
+            box-shadow: 0 8px 20px color-mix(in srgb, var(--role-primary-500) 25%, transparent);
+            background: #fff;
+        }
+
+    .mhead {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: .95rem;
+        margin-bottom: 6px;
+    }
+
+    .mbadge {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(0,0,0,.2);
+        flex-shrink: 0;
+    }
+
+    .msub {
+        font-size: .85rem;
+        color: #6b7280;
+        margin-bottom: 8px;
+        line-height: 1.4;
+    }
+
+    .mgrid {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+        .mgrid > div {
+            min-width: 0;
+        }
+
+        .mgrid .k {
+            color: #111827; /* darker for clarity */
+            font-weight: 700; /* stronger headings */
+            font-size: 1.05rem; /* larger headings for better readability */
+        }
+
+    .copy {
+        font-size: .82rem;
+        border: 1px dashed #e5e7eb;
+        border-radius: 8px;
+        padding: 4px 8px;
+        cursor: pointer;
+        transition: all .2s ease;
+        display: inline-block;
+        margin-top: 4px;
+    }
+
+        .copy:hover {
+            background: #f9fafb;
+            border-color: var(--role-primary-500);
+            color: var(--role-primary-600);
+        }
+
+    .alert {
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        border: 1px solid #fef3c7;
+        background: #fffbeb;
+        color: #92400e;
+        font-size: .95rem;
+    }
+
+    /* Responsive */
+    @@media (max-width:768px) {
+        .viewer-title {
+            font-size: clamp(1.25rem, 1rem + 3vw, 1.8rem);
+            -webkit-line-clamp: 3;
+        }
+
+        .toolbar {
+            gap: 8px;
+        }
+
+        .tb-btn {
+            --h: 36px;
+            padding: 0 12px;
+            font-size: .9rem;
+        }
+
+        .scenes {
+            grid-template-columns: repeat(auto-fill,minmax(160px,1fr));
+            gap: 12px;
+        }
+
+        .stage-head {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .viewport {
+            height: auto; /* keep content-driven height on small screens */
+            min-height: unset;
+        }
+
+        .mgrid {
+            grid-template-columns: 1fr;
+            gap: 4px;
+        }
+    }
+
+    /* Print */
+    @@media print {
+        .viewer-head, .toolbar, .panel-card, .meta-chips {
+            display: none !important;
+        }
+
+        .viewport {
+            height: auto !important;
+            overflow: visible !important;
+            border: none !important;
+        }
+
+        .stage-card {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+        }
+    }
+
+    .btn-secondary {
+        background: #fff;
+        border: 1px solid rgba(137,186,23,.35);
+        color: #6a9312; /* fixed uni green, not palette */
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-weight: 800;
+        text-decoration: none !important;
+        transition: background .2s ease, color .2s ease, border-color .2s ease;
+    }
+
+        .btn-secondary:hover {
+            background: rgba(137,186,23,.08);
+            color: #6a9312;
+        }
+
+</style>
+
+<div class="viewer-head">
+    <div class="viewer-top-actions" style="margin-bottom:10px;display:flex;justify-content:flex-start;">
+        <a class="btn btn-secondary" href="@backHref" title="Zur Übersicht">
+            Zur Übersicht
+        </a>
+    </div>
+
+    <div class="viewer-meta">
+        <details class="viewer-meta-acc" open>
+            <summary>
+                <span class="viewer-meta-title">
+                    <span class="viewer-meta-caret" aria-hidden="true"></span>
+                    <i class="fas fa-info-circle fs-5"></i> Allgemeine Informationen
+                </span>
+            </summary>
+            <div class="acc-body">
+                <div class="viewer-meta-grid">
+                    @if (!string.IsNullOrWhiteSpace(Model.Title))
+                    {
+                        <div class="item full">
+                            <label>Titel</label>
+                            <div class="val richtext">@Html.Raw(Model.Title)</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Zielgruppe))
+                    {
+                        <div class="item">
+                            <label>Zielgruppe</label>
+                            <div class="val richtext">@Html.Raw(Model.Zielgruppe)</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Lernziel))
+                    {
+                        <div class="item">
+                            <label>Lernziel</label>
+                            <div class="val richtext">@Html.Raw(Model.Lernziel)</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Beschreibung))
+                    {
+                        <div class="item full">
+                            <label>Beschreibung</label>
+                            <div class="val richtext">@Html.Raw(Model.Beschreibung)</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Farbpalette))
+                    {
+                        var colors = Model.Farbpalette.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(8).ToArray();
+                        var hexes = colors.Select(c => c.StartsWith("#") ? c : ("#" + c)).ToArray();
+                        <div class="item full">
+                            <label>Farbpalette</label>
+                            <div class="viewer-palette">
+                                @foreach (var cc in hexes)
+                                {
+                                    <div class="swatch-wrap" title="@cc">
+                                        <div class="swatch" style="background-color:@cc"></div>
+                                        <div class="swatch-hex">@cc</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.Taxonomie.HasValue)
+                    {
+                        var levels = Enumerable.Range(0, (int)Model.Taxonomie.Value + 1).ToArray();
+                        <div class="item full">
+                            <label>Taxonomie</label>
+                            <div class="viewer-taxo">
+                                @for (var i = 0; i < levels.Length; i++)
+                                {
+                                    var name = ((ProjectsWebApp.Models.TaxonomieStufe)levels[i]).ToString();
+                                    var isLast = i == levels.Length - 1;
+                                    <span class="chip @(isLast ? "active" : "")">@name</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <div class="toolbar">
+        @* LEFT: Marker platzieren (public or internal) *@
+        @if (!string.IsNullOrWhiteSpace(publicSlug))
+        {
+            <a class="tb-btn" href="@Url.Action("OpenBySlug", "PublicStoryboards", new { area = "User", slug = publicSlug })" title="Marker platzieren">
+                <i class="fa fa-thumb-tack"></i>
+                Marker platzieren
+            </a>
+            <div class="sep"></div>
+        }
+        else
+        {
+            <a class="tb-btn" asp-area="User" asp-controller="Storyboards" asp-action="Details" asp-route-id="@Model.Id" title="Marker platzieren">
+                <i class="fa fa-thumb-tack"></i>
+                Marker platzieren
+            </a>
+            <div class="sep"></div>
+        }
+
+        @* CENTER: scene + zoom + tools *@
+        <button class="tb-btn" id="prevScene" type="button" title="Vorherige Szene">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6" />
+            </svg>
+        </button>
+        <button class="tb-btn" id="nextScene" type="button" title="Nächste Szene">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6" />
+            </svg>
+        </button>
+        <div class="sep"></div>
+        <button class="tb-btn" id="zoomOut" type="button" title="Zoom out">−</button>
+        <span class="tb-btn mono" id="zoomLabel" style="pointer-events:none;">100%</span>
+        <button class="tb-btn" id="zoomIn" type="button" title="Zoom in">＋</button>
+        <button class="tb-btn" id="fitBtn" type="button" title="An Fenster anpassen">Fit</button>
+        <button class="tb-btn" id="actualBtn" type="button" title="1:1">100%</button>
+        <div class="sep"></div>
+        <button class="tb-btn" id="toggleMarkers" type="button" title="Marker ein/aus">Marker</button>
+        <button class="tb-btn" id="fsBtn" type="button" title="Vollbild">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+        </button>
+        <span class="dd" id="printDd">
+            <button class="tb-btn" id="printBtn" type="button" title="Export als PDF">
+                <i class="fa fa-file-pdf fa-lg"></i>
+                <span style="font-weight:700;">PDF</span>
+            </button>
+            <div class="menu" id="printMenu">
+                <button type="button" class="menu-item" id="printOptCurrent">Aktuelle Szene exportieren</button>
+                <button type="button" class="menu-item" id="printOptAll">Alle Szenen exportieren</button>
+            </div>
+        </span>
+    </div>
+
+</div>
+
+@if (!(Model.Scenes?.Any() ?? false))
+{
+    <div class="alert">Dieses Storyboard hat noch keine Szenen.</div>
+}
+else
+{
+    var taxoChain = Model.Taxonomie.HasValue ? string.Join(", ", Enumerable.Range(0, (int)Model.Taxonomie.Value + 1).Select(i => ((ProjectsWebApp.Models.TaxonomieStufe)i).ToString())) : "";
+    <div class="viewer-stack mb-5"
+         data-sb-id="@Model.Id"
+         data-active-scene-id="@activeScene?.Id"
+         data-title="@Model.Title"
+         data-zg="@Model.Zielgruppe"
+         data-lz="@Model.Lernziel"
+         data-desc="@Model.Beschreibung"
+         data-taxo="@taxoChain"
+         data-license="@Model.License"
+         data-authors="@Model.Authors"
+         data-lextras="@Model.LicenseExtras"
+         data-palette="@paletteAttr">
+        <!-- STAGE -->
+        <section class="stage-card">
+            <div class="stage-head">
+                <div>
+                    <div class="stage-title">@((string.IsNullOrWhiteSpace(activeScene?.Name) ? $"{activeScene?.Number}. Szene" : $"{activeScene?.Number}. {activeScene?.Name}"))</div>
+                    <div class="stage-sub" id="imgMeta">–</div>
+                </div>
+                <div class="tb-btn mono" style="gap:6px;min-width:unset;">
+                    <span id="statusCount">— Marker</span>
+                </div>
+            </div>
+
+            <div id="viewport" class="viewport">
+                <div id="zoomWrap" class="zoom-wrap" style="transform:scale(1)">
+                    <div id="board" class="board">
+                        <img id="sceneImg"
+                             src="@(string.IsNullOrWhiteSpace(activeScene?.ImagePath) ? placeholder : (basePath + activeScene.ImagePath))"
+                             alt="@Model.Title"
+                             onerror="this.src='@placeholder'" />
+                        <div id="overlay" class="overlay" aria-hidden="false"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PANEL -->
+        <section class="panel-card" id="scenePanel">
+            <div class="panel-title-row" id="scenePanelHeader">
+                <div class="panel-title">Szenen</div>
+                <button type="button" class="panel-float-btn" id="panelFloatToggle" title="Panel lösen und verschieben" aria-pressed="false" aria-label="Szenen-Panel lösen">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="5 9 5 5 9 5" />
+                        <polyline points="15 5 19 5 19 9" />
+                        <polyline points="19 15 19 19 15 19" />
+                        <polyline points="9 19 5 19 5 15" />
+                    </svg>
+                </button>
+            </div>
+            <div class="scenes">
+                @foreach (var sc in scenes)
+                {
+                    var isActive = sc.Id == activeScene?.Id;
+                    <div class="scene-item @(isActive ? "active" : "")"
+                         data-scene-id="@sc.Id"
+                         data-number="@sc.Number"
+                         data-name="@(string.IsNullOrWhiteSpace(sc.Name) ? $"{sc.Number}. Szene" : $"{sc.Number}. {sc.Name}")">
+                        <div class="scene-thumb">
+                            <img src="@(string.IsNullOrWhiteSpace(sc.ImagePath) ? placeholder : (basePath + sc.ImagePath))" alt="Szene @sc.Number" onerror="this.src='@placeholder'" />
+                        </div>
+                        <div class="scene-caption">@(string.IsNullOrWhiteSpace(sc.Name) ? $"{sc.Number}. Szene" : $"{sc.Number}. {sc.Name}")</div>
+                    </div>
+                }
+            </div>
+
+            <div class="tools-row">
+                <label class="switch"><input type="checkbox" id="toggleListDetails" checked /> Details anzeigen</label>
+                <div class="sep" style="height:24px"></div>
+                <span class="sel-info" id="selInfo">Kein Marker gewählt</span>
+            </div>
+
+            <div class="search">
+                <input id="searchBox" placeholder="Suche nach Marker, Text, Ziel, Model …" />
+                <button class="tb-btn" id="clearSearch" type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+            </div>
+
+            <div id="markerList" class="marker-list"></div>
+            <div class="panel-resizer" id="panelResizer" aria-hidden="true"></div>
+        </section>
+    </div>
+}
+
+@section Scripts {
+    <!-- PDF libs (no SRI; correct order) -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <script>
+        // ---- Color & Styling Roles (derived from Farbpalette) ----
+        (function applyRoleColors(){
+          const container = document.querySelector('.viewer-stack');
+          if (!container) return;
+
+          const raw = (container.dataset.palette || '').split(',').map(s => s.trim()).filter(Boolean);
+          if (!raw.length) return; // keep defaults
+
+          const primary = raw[0].startsWith('#') ? raw[0] : ('#' + raw[0]);
+
+          function hexToRgb(h){
+            const x = h.replace('#','');
+            const v = x.length===3 ? x.split('').map(c=>c+c).join('') : x;
+            const r=parseInt(v.slice(0,2),16), g=parseInt(v.slice(2,4),16), b=parseInt(v.slice(4,6),16);
+            return [r,g,b];
+          }
+          function rgbToHsl(r,g,b){
+            r/=255; g/=255; b/=255;
+            const max=Math.max(r,g,b), min=Math.min(r,g,b);
+            let h,s,l=(max+min)/2;
+            if(max===min){ h=s=0; } else {
+              const d=max-min;
+              s = l>0.5 ? d/(2-max-min) : d/(max+min);
+              switch(max){
+                case r: h=(g-b)/d + (g<b?6:0); break;
+                case g: h=(b-r)/d + 2; break;
+                case b: h=(r-g)/d + 4; break;
+              }
+              h/=6;
+            }
+            return [h,s,l];
+          }
+          function hslToHex(h,s,l){
+            function f(n){
+              const k=(n+h*12)%12, a=s*Math.min(l,1-l);
+              const c=l - a*Math.max(-1, Math.min(k-3, Math.min(9-k,1)));
+              return Math.round(255*c).toString(16).padStart(2,'0');
+            }
+            return '#' + f(0) + f(8) + f(4);
+          }
+          function withL(hx, lMul){
+            const [r,g,b]=hexToRgb(hx); const [h,s,l]=rgbToHsl(r,g,b);
+            const l2 = Math.max(0, Math.min(1, l*lMul));
+            return hslToHex(h,s,l2);
+          }
+
+          // Generate simple shade ramp around the provided color
+          const c500 = primary;
+          const c400 = withL(c500, 1.10);
+          const c600 = withL(c500, 0.90);
+          const c700 = withL(c500, 0.78);
+
+          const root = document.documentElement.style;
+          root.setProperty('--role-primary-400', c400);
+          root.setProperty('--role-primary-500', c500);
+          root.setProperty('--role-primary-600', c600);
+          root.setProperty('--role-primary-700', c700);
+
+          // dependent tokens
+          const chipBg = 'color-mix(in srgb, var(--role-primary-500) 12%, #ffffff)';
+          const chipBd = 'color-mix(in srgb, var(--role-primary-500) 25%, #ffffff)';
+          const chipMutedBg = 'color-mix(in srgb, var(--role-primary-500) 8%, #ffffff)';
+          const chipMutedBd = 'color-mix(in srgb, var(--role-primary-500) 20%, #ffffff)';
+          root.setProperty('--role-chip-bg', chipBg);
+          root.setProperty('--role-chip-border', chipBd);
+          root.setProperty('--role-chip-muted-bg', chipMutedBg);
+          root.setProperty('--role-chip-muted-border', chipMutedBd);
+        })();
+    </script>
+
+    <script>
+        (() => {
+          const PATH_BASE = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(basePath));
+          const API = { list: sceneId => fetch(`${PATH_BASE}/api/scenes/${sceneId}/markers`).then(r=>r.ok?r.json():[]) };
+          const TAXO_NAMES = ['Erinnern','Verstehen','Anwenden','Analysieren','Bewerten','Erschaffen'];
+          const MAX_TAXO = @Html.Raw((Model.Taxonomie.HasValue ? ((int)Model.Taxonomie.Value).ToString() : "-1"));
+          const taxoName = (v) => (typeof v === 'number' && v>=0 && v<TAXO_NAMES.length) ? TAXO_NAMES[v] : '';
+          const taxoChain = (v) => {
+            const n = (typeof v === 'number' && v>=0) ? v : (MAX_TAXO>=0?MAX_TAXO:null);
+            return (n==null) ? '' : TAXO_NAMES.slice(0, Math.min(n+1, TAXO_NAMES.length)).join(', ');
+          };
+
+          // Elements
+          const q = s => document.querySelector(s), qa = s => Array.from(document.querySelectorAll(s));
+          const viewport = q('#viewport'), zoomWrap = q('#zoomWrap'), board = q('#board'),
+                img = q('#sceneImg'), overlay = q('#overlay'), markerList = q('#markerList');
+          const scenePanel = q('#scenePanel');
+          const scenePanelHeader = q('#scenePanelHeader');
+          const panelFloatToggle = q('#panelFloatToggle');
+          const panelResizer = q('#panelResizer');
+          const container = q('.viewer-stack'); const sbId = parseInt(container?.dataset.sbId || '0',10);
+          let currentSceneId = parseInt(container?.dataset.activeSceneId || '0',10);
+
+          const zoomLabel = q('#zoomLabel'), btnIn = q('#zoomIn'), btnOut = q('#zoomOut'),
+                btnFit = q('#fitBtn'), btnAct = q('#actualBtn'), btnPdf = q('#printBtn'),
+                btnFs = q('#fsBtn'), btnPrev = q('#prevScene'), btnNext = q('#nextScene'),
+                btnToggle = q('#toggleMarkers');
+          const statusCount = q('#statusCount'), imgMeta = q('#imgMeta');
+          const searchBox = q('#searchBox'), clearSearch = q('#clearSearch'),
+                toggleLD = q('#toggleListDetails'), selInfo = q('#selInfo');
+
+          // Meta for PDF
+          const meta = {
+            title: container?.dataset.title || '',
+            zg: container?.dataset.zg || '',
+            lz: container?.dataset.lz || '',
+            desc: container?.dataset.desc || '',
+            taxo: container?.dataset.taxo || '',
+            license: container?.dataset.license || '',
+            authors: (container?.dataset.authors || '').split(',').map(x => x.trim()).filter(Boolean),
+            lextras: container?.dataset.lextras || '',
+            palette: (container?.dataset.palette || '').split(',').map(x => x.trim()).filter(Boolean)
+          };
+
+          // State
+          let scale = 1, markers = [], selectedId = null, markersVisible = true, lastPinnedPop = null;
+          let panelFloating = false;
+          let dragState = null;
+          let resizeState = null;
+          let floatingWidth = null;
+
+          function clampPanelPosition(left, top){
+            if (!scenePanel) return;
+            const rect = scenePanel.getBoundingClientRect();
+            const vw = window.innerWidth || document.documentElement.clientWidth || rect.width;
+            const vh = window.innerHeight || document.documentElement.clientHeight || rect.height;
+            const maxLeft = vw - rect.width - 8;
+            const maxTop  = vh - rect.height - 8;
+            const safeLeft = Math.max(8, Math.min(maxLeft, left));
+            const safeTop  = Math.max(8, Math.min(maxTop, top));
+            scenePanel.style.left = safeLeft + 'px';
+            scenePanel.style.top  = safeTop + 'px';
+          }
+
+          // Floating Szenen panel
+          function setPanelFloating(on, options){
+            if (!scenePanel) return;
+            const opts = options || {};
+            panelFloating = !!on;
+            scenePanel.classList.toggle('floating', panelFloating);
+            if (panelFloatToggle){
+              panelFloatToggle.setAttribute('aria-pressed', panelFloating ? 'true' : 'false');
+              panelFloatToggle.title = panelFloating
+                ? 'Panel wieder andocken'
+                : 'Panel lösen und verschieben';
+            }
+            if (!panelFloating){
+              scenePanel.style.left = '';
+              scenePanel.style.top = '';
+              scenePanel.style.width = '';
+              return;
+            }
+            const rect = scenePanel.getBoundingClientRect();
+            const vw = window.innerWidth || document.documentElement.clientWidth || rect.width;
+            const vh = window.innerHeight || document.documentElement.clientHeight || rect.height;
+
+            // Determine width to use in floating mode: reuse previous floatingWidth if present,
+            // otherwise start from the current rendered width in the layout.
+            if (floatingWidth == null){
+              floatingWidth = rect.width;
+            }
+            scenePanel.style.width = floatingWidth + 'px';
+            let baseLeft;
+            let baseTop;
+            if (opts.anchor === 'current') {
+              // keep visual position when switching from docked to floating
+              baseLeft = rect.left;
+              baseTop = rect.top;
+            } else {
+              baseLeft = vw - rect.width - 24; // anchor near right edge
+              baseTop = rect.top;              // keep roughly same vertical origin
+            }
+            clampPanelPosition(baseLeft, baseTop);
+          }
+
+          panelFloatToggle?.addEventListener('click', () => {
+            setPanelFloating(!panelFloating);
+          });
+
+          scenePanelHeader?.addEventListener('pointerdown', (e) => {
+            if (!scenePanel) return;
+            if (panelFloatToggle && panelFloatToggle.contains(e.target)) return;
+            if (!panelFloating) {
+              setPanelFloating(true, { anchor: 'current' });
+            }
+            dragState = dragState || {};
+            const rect = scenePanel.getBoundingClientRect();
+            dragState.offsetX = e.clientX - rect.left;
+            dragState.offsetY = e.clientY - rect.top;
+            dragState.pointerId = e.pointerId;
+            scenePanelHeader.setPointerCapture(e.pointerId);
+            scenePanel.classList.add('dragging');
+            e.preventDefault();
+          });
+
+          scenePanelHeader?.addEventListener('pointermove', (e) => {
+            if (!panelFloating || !scenePanel || !dragState || dragState.pointerId !== e.pointerId) return;
+            const rawLeft = e.clientX - dragState.offsetX;
+            const rawTop  = e.clientY - dragState.offsetY;
+            clampPanelPosition(rawLeft, rawTop);
+            e.preventDefault();
+          });
+
+          scenePanelHeader?.addEventListener('pointerup', (e) => {
+            if (!dragState || dragState.pointerId !== e.pointerId) return;
+            try { scenePanelHeader.releasePointerCapture(e.pointerId); } catch {}
+            dragState = null;
+            scenePanel?.classList.remove('dragging');
+          });
+
+          // Resize (width) of floating panel
+          panelResizer?.addEventListener('pointerdown', (e) => {
+            if (!panelFloating || !scenePanel) return;
+            resizeState = {
+              pointerId: e.pointerId,
+              startX: e.clientX,
+              startWidth: scenePanel.offsetWidth || scenePanel.getBoundingClientRect().width
+            };
+            panelResizer.setPointerCapture(e.pointerId);
+            e.preventDefault();
+          });
+
+          panelResizer?.addEventListener('pointermove', (e) => {
+            if (!resizeState || resizeState.pointerId !== e.pointerId || !scenePanel) return;
+            const deltaX = e.clientX - resizeState.startX;
+            const vw = window.innerWidth || document.documentElement.clientWidth || resizeState.startWidth;
+            const minWidth = 260;
+            const maxWidth = Math.min(700, vw - 32);
+            let newWidth = resizeState.startWidth + deltaX;
+            newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+            floatingWidth = newWidth;
+            scenePanel.style.width = newWidth + 'px';
+
+            // Ensure we still stay inside the viewport horizontally after resize
+            const rect = scenePanel.getBoundingClientRect();
+            clampPanelPosition(rect.left, rect.top);
+            e.preventDefault();
+          });
+
+          function endResize(e){
+            if (!resizeState || (e && resizeState.pointerId !== e.pointerId)) return;
+            try { panelResizer.releasePointerCapture(resizeState.pointerId); } catch {}
+            resizeState = null;
+          }
+
+          panelResizer?.addEventListener('pointerup', endResize);
+          panelResizer?.addEventListener('pointercancel', endResize);
+
+          window.addEventListener('resize', () => {
+            if (!panelFloating || !scenePanel) return;
+            const rect = scenePanel.getBoundingClientRect();
+            const currentLeft = parseFloat(scenePanel.style.left || rect.left) || rect.left;
+            const currentTop  = parseFloat(scenePanel.style.top || rect.top) || rect.top;
+            clampPanelPosition(currentLeft, currentTop);
+          });
+
+          // Helpers
+          function setScale(v){ scale = Math.max(.25, Math.min(4, v)); zoomWrap.style.transform = `scale(${scale})`; zoomLabel.textContent = Math.round(scale*100)+'%'; }
+          function fitToViewport(){ setScale(1); viewport.scrollTo({top:0,left:0}); }
+          function sceneIds(){ return qa('.scene-item').map(x => parseInt(x.dataset.sceneId)).filter(n=>!Number.isNaN(n)); }
+          function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+          const px = n => `${n}px`, toP = n => Math.round(n*1000)/10+'%';
+
+          // Normalize API payload
+          const N = m => ({
+            id: m.id ?? m.Id,
+            x: m.x ?? m.X,
+            y: m.y ?? m.Y,
+            number: m.number ?? m.Number ?? 0,
+            colorHex: m.colorHex ?? m.ColorHex ?? '#4a86e8',
+            description: m.description ?? m.Description ?? '',
+            ziel: m.ziel ?? m.Ziel ?? '',
+            datenablage: m.datenablage ?? m.Datenablage ?? '',
+            quellen: m.quellen ?? m.Quellen ?? '',
+            promptIdee: m.promptIdee ?? m.PromptIdee ?? '',
+            reflexion: m.reflexion ?? m.Reflexion ?? '',
+            model: m.model ?? m.Model ?? '',
+            sceneId: m.sceneId ?? m.SceneId,
+            taxonomie: m.taxonomie ?? m.Taxonomie ?? null
+          });
+
+          // Overlay + markers
+          function renderOverlay(){
+            overlay.innerHTML = '';
+            if (!markersVisible) return;
+
+            const iw = img.clientWidth, ih = img.clientHeight;
+            if(!iw || !ih) return;
+
+            markers.forEach(m => {
+              const wrap = document.createElement('div');
+              wrap.className = 'dot-wrap';
+              wrap.style.left = px(m.x*iw);
+              wrap.style.top  = px(m.y*ih);
+              wrap.dataset.id = m.id;
+
+              const dot   = document.createElement('span'); dot.className = 'marker-dot'; dot.style.setProperty('--c', m.colorHex);
+              const badge = document.createElement('span'); badge.className = 'num-badge'; badge.textContent = m.number; badge.style.background = m.colorHex || 'var(--role-primary-600)';
+
+              const pop = document.createElement('div'); pop.className = 'pop';
+              wrap.appendChild(dot); wrap.appendChild(badge); wrap.appendChild(pop);
+              overlay.appendChild(wrap);
+
+              wrap.addEventListener('click', e => {
+                e.stopPropagation();
+                selectMarker(m.id, {center:true, ripple:true, pinPopover:true});
+              });
+            });
+          }
+
+                function markerSummary(m){
+          const firstRaw = [m.ziel, m.model, m.description].find(v => (v||'').trim().length>0) || '—';
+          const plain = htmlToText(firstRaw);
+          const s = plain.length > 160 ? plain.slice(0,160) + '…' : plain;
+          return s;
+        }
+
+        function renderList(){
+          const qv = (searchBox?.value || '').toLowerCase().trim();
+          markerList.innerHTML = '';
+
+          const list = markers
+            .slice()
+            .sort((a,b)=> a.number - b.number || a.id - b.id)
+            .filter(m => {
+              if (!qv) return true;
+              const blob = [m.number, m.ziel, m.model, m.description, m.datenablage, m.promptIdee, m.reflexion]
+                .join(' ')
+                .toLowerCase();
+              return blob.includes(qv);
+            });
+
+          statusCount.textContent = `${markers.length} Marker`;
+
+          list.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'mcard';
+            card.dataset.id = m.id;
+
+            // header
+            const head = document.createElement('div');
+            head.className = 'mhead';
+            const badge = document.createElement('span');
+            badge.className = 'mbadge';
+            badge.style.background = m.colorHex;
+            const title = document.createElement('span');
+            title.textContent = `Marker ${m.number}`;
+            head.append(badge, title);
+
+            // grid (details)
+            const grid = document.createElement('div');
+            grid.className = 'mgrid';
+            grid.style.display = toggleLD?.checked ? 'grid' : 'none';
+
+            const rows = [
+              ['Ziel',          m.ziel],
+              ['Model',         m.model],
+              ['Beschreibung',  m.description],
+              ['Datenablage',   m.datenablage],
+              ['Prompt-Idee',   m.promptIdee],
+              ['Reflexion – Notizen', m.reflexion]
+            ];
+
+            rows.forEach(([k, v]) => {
+              const vPlain = htmlToText(v ?? '').trim();
+              if (!vPlain) return; // skip empty fields completely
+
+              const kEl = document.createElement('div');
+              kEl.className = 'k';
+              kEl.textContent = k;
+
+              const vEl = document.createElement('div');
+              vEl.textContent = vPlain; // plain text, never HTML
+
+              grid.append(kEl, vEl);
+            });
+
+            card.append(head, grid);
+            card.addEventListener('mouseenter', ()=> pulseMarker(m.id));
+            card.addEventListener('click', ()=> selectMarker(m.id, {center:true, ripple:true, pinPopover:true, scroll:false}));
+            markerList.appendChild(card);
+          });
+
+          if (selectedId != null) setActiveCard(selectedId);
+        }
+
+
+          function getMarkerById(id){ return markers.find(x => x.id === id); }
+          function findDotWrapById(id){ return overlay.querySelector(`.dot-wrap[data-id="${id}"]`); }
+
+          function centerOnMarker(m){
+            if (!m || !img.naturalWidth || !img.naturalHeight) return;
+            const targetLeft = m.x * img.naturalWidth - (viewport.clientWidth / (2*scale));
+            const targetTop  = m.y * img.naturalHeight - (viewport.clientHeight / (2*scale));
+            viewport.scrollTo({ left: Math.max(0, targetLeft), top: Math.max(0, targetTop), behavior: 'smooth' });
+          }
+
+          function pulseMarker(id){
+            const wrap = findDotWrapById(id); if (!wrap) return;
+            const dot = wrap.querySelector('.marker-dot'); if (!dot) return;
+            const ping = document.createElement('span'); ping.className = 'ping'; ping.style.borderColor = getComputedStyle(dot).getPropertyValue('--c');
+            wrap.appendChild(ping); setTimeout(()=> ping.remove(), 1200);
+          }
+
+          function setActiveCard(id){ qa('.mcard').forEach(c => c.classList.toggle('active', parseInt(c.dataset.id) === id)); }
+
+          function pinPopover(wrap, show){
+            if (lastPinnedPop && lastPinnedPop !== wrap){
+              const old = lastPinnedPop.querySelector('.pop'); old && old.classList.remove('show');
+            }
+            const pop = wrap.querySelector('.pop'); if (!pop) return;
+            if (show){ pop.classList.add('show'); lastPinnedPop = wrap; }
+            else{ pop.classList.remove('show'); if (lastPinnedPop === wrap) lastPinnedPop = null; }
+          }
+
+          function selectMarker(id, opts = {}){
+            selectedId = id; setActiveCard(id);
+            const m = getMarkerById(id); const wrap = findDotWrapById(id);
+            if (!m || !wrap) return;
+
+            // Show only a simple marker identifier in the status label (no content/title)
+            selInfo.textContent = `Marker #${m.number}`;
+
+            if (opts.ripple) pulseMarker(id);
+            if (opts.center) centerOnMarker(m);
+            if (opts.pinPopover) pinPopover(wrap, true);
+
+            qa('.marker-dot').forEach(d => d.classList.remove('selected'));
+            wrap.querySelector('.marker-dot')?.classList.add('selected');
+
+            if (opts.scroll !== false){
+              const card = markerList.querySelector(`.mcard[data-id="${id}"]`);
+              if (card) card.scrollIntoView({behavior:'smooth', block:'nearest'});
+            }
+          }
+
+          // Scene switching
+          async function loadScene(sceneId){
+            qa('.scene-item').forEach(x => x.classList.toggle('active', parseInt(x.dataset.sceneId) === sceneId));
+            const act = document.querySelector(`.scene-item[data-scene-id="${sceneId}"]`);
+            const title = act?.dataset.name || '';
+            const head = document.querySelector('.stage-title');
+            if (head) head.textContent = title;
+
+            const newSrc = act?.querySelector('img')?.getAttribute('src');
+            if (newSrc && img.getAttribute('src') !== newSrc){
+              overlay.innerHTML = '';
+              img.src = newSrc;
+            }
+
+            currentSceneId = sceneId;
+            const data = await API.list(sceneId);
+            markers = data.map(N);
+
+            renderOverlay(); renderList(); fitAfterImage();
+          }
+
+          function fitAfterImage(){
+            if (img?.complete && img.naturalWidth){
+              imgMeta.textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
+              fitToViewport();
+            } else {
+              img.addEventListener('load', () => {
+                imgMeta.textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
+                fitToViewport();
+              }, { once:true });
+            }
+          }
+
+          // Zoom & controls
+          function toggleMarkers(){ markersVisible = !markersVisible; btnToggle.classList.toggle('active', markersVisible); renderOverlay(); }
+          btnIn?.addEventListener('click', ()=> setScale(scale*1.2));
+          btnOut?.addEventListener('click', ()=> setScale(scale/1.2));
+          btnFit?.addEventListener('click', fitToViewport);
+          btnAct?.addEventListener('click', ()=> setScale(1));
+          btnFs?.addEventListener('click', ()=> { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); });
+          btnToggle?.addEventListener('click', toggleMarkers);
+
+          viewport?.addEventListener('wheel', (e) => {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            setScale(scale * (e.deltaY > 0 ? 1/1.15 : 1.15));
+          }, { passive:false });
+
+          // Prev/Next scenes
+          btnPrev?.addEventListener('click', () => { const ids = sceneIds(); const i = ids.indexOf(currentSceneId); if (i>0) loadScene(ids[i-1]); });
+          btnNext?.addEventListener('click', () => { const ids = sceneIds(); const i = ids.indexOf(currentSceneId); if (i>=0 && i<ids.length-1) loadScene(ids[i+1]); });
+          document.addEventListener('keydown', (e) => {
+            if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+            if (e.key === 'ArrowLeft') btnPrev?.click();
+            if (e.key === 'ArrowRight') btnNext?.click();
+            if (e.key === '+') btnIn?.click();
+            if (e.key === '-') btnOut?.click();
+            if (e.key === 'f' || e.key === 'F') btnFit?.click();
+            if (e.key === '1') btnAct?.click();
+          });
+
+          // Filter & list/detail toggle
+          searchBox?.addEventListener('input', renderList);
+          clearSearch?.addEventListener('click', () => { searchBox.value=''; renderList(); });
+          toggleLD?.addEventListener('change', renderList);
+
+          overlay?.addEventListener('click', (e) => {
+            if (e.target.closest('.dot-wrap')) return;
+            if (lastPinnedPop) pinPopover(lastPinnedPop, false);
+          });
+
+          // ---------- Export PDF ----------
+          function hexToRgb(hex){
+            const h = hex.replace('#','').trim();
+            if (h.length === 3) { const r=h[0]+h[0], g=h[1]+h[1], b=h[2]+h[2]; return [parseInt(r,16),parseInt(g,16),parseInt(b,16)]; }
+            if (h.length >= 6) return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
+            return [74,134,232];
+          }
+          function htmlToText(input){
+            try{
+              const div = document.createElement('div');
+              div.innerHTML = String(input || '');
+              const txt = div.textContent || div.innerText || '';
+              return txt.replace(/\s+/g, ' ').trim();
+            } catch{ return String(input||''); }
+          }
+
+          // ---- Minimal HTML -> styled lines (bold/italic, br, p, ul/ol/li) for PDF ----
+          function parseHtmlToElements(html){
+            const root = document.createElement('div'); root.innerHTML = String(html||'');
+            const elements = [];
+            function collectRuns(node, style){
+              const runs = [];
+              const st = { bold: !!(style&&style.bold), italic: !!(style&&style.italic), underline: !!(style&&style.underline), color: style?.color || null };
+              node.childNodes.forEach(ch=>{
+                if (ch.nodeType === 3){
+                  const t = ch.textContent||''; if (t) runs.push({ text: t, ...st });
+                } else if (ch.nodeType === 1){
+                  const tag = ch.tagName.toLowerCase();
+                  if (tag === 'br'){ runs.push({ text: '\n', br:true, ...st }); return; }
+                  // derive next style
+                  let next = { bold: st.bold || tag==='b' || tag==='strong', italic: st.italic || tag==='i' || tag==='em', underline: st.underline || tag==='u', color: st.color };
+                  if (tag === 'a'){ next.underline = true; next.color = next.color || '#1d4ed8'; }
+                  if (tag === 'span' || tag === 'a'){
+                    const css = (ch.getAttribute('style')||'').toLowerCase();
+                    if (/font-weight\s*:\s*(bold|700|800|900)/.test(css)) next.bold = true;
+                    if (/font-style\s*:\s*italic/.test(css)) next.italic = true;
+                    if (/text-decoration\s*:\s*underline/.test(css)) next.underline = true;
+                    const m = css.match(/color\s*:\s*(#[0-9a-f]{3,8}|rgb\([^)]+\))/);
+                    if (m) next.color = m[1];
+                  }
+                  runs.push(...collectRuns(ch, next));
+                }
+              });
+              return runs;
+            }
+            function addParagraph(runs){ elements.push({ type:'p', runs }); }
+            function addList(items, ordered){ elements.push({ type: ordered?'ol':'ul', items }); }
+            function handle(node){
+              if (node.nodeType === 3){ const t=node.textContent||''; if (t.trim()) addParagraph([{text:t}]); return; }
+              if (node.nodeType !== 1) return;
+              const tag = node.tagName.toLowerCase();
+              if (tag === 'p' || tag==='blockquote' || tag==='div'){
+                const runs = collectRuns(node, {});
+                if (runs.length) addParagraph(runs);
+              } else if (tag==='ul' || tag==='ol'){
+                const items=[]; let idx=1;
+                node.querySelectorAll(':scope>li').forEach(li=>{ items.push({ runs: collectRuns(li,{}) , idx: idx++ }); });
+                addList(items, tag==='ol');
+              } else if (tag==='br'){
+                addParagraph([{text:'\n'}]);
+              } else {
+                // inline-only container -> treat as paragraph
+                const runs = collectRuns(node, {}); if (runs.length) addParagraph(runs);
+              }
+            }
+            Array.from(root.childNodes).forEach(handle);
+            return elements;
+          }
+
+          function measureTextWidth(pdf, text, style){
+            const s = style?.bold && style?.italic ? 'bolditalic' : (style?.bold ? 'bold' : (style?.italic ? 'italic' : 'normal'));
+            pdf.setFont('helvetica', s); pdf.setFontSize(10);
+            return pdf.getTextWidth(text||'');
+          }
+
+          function wrapElementsToLines(pdf, elements, maxWidth){
+            const lines = [];
+            const pushLine = (segments, indent=0)=>{ lines.push({ segments, indent }); };
+            function flushBuffer(buf, indent){ if (buf.length) pushLine(buf.splice(0, buf.length), indent||0); }
+            function wrapRuns(runs, indent){
+              let curW = indent||0; let buf=[];
+              const spaceW = measureTextWidth(pdf, ' ', {});
+              const addWord = (word, style)=>{
+                const w = measureTextWidth(pdf, word, style);
+                if (curW + w > maxWidth && buf.length){ flushBuffer(buf, indent); curW = indent||0; }
+                buf.push({ text: word, style, xOffset: curW }); curW += w;
+              };
+              const newLine = ()=>{ flushBuffer(buf, indent); curW = indent||0; };
+              runs.forEach(r=>{
+                if (r.br){ newLine(); return; }
+                const parts = String(r.text||'').split(/(\s+)/);
+                parts.forEach(p=>{
+                  if (!p) return;
+                  const isSpace = /^(\s+)$/.test(p);
+                  if (isSpace){
+                    if (curW === (indent||0)) return; // skip leading space at line start
+                  }
+                  addWord(p, { bold: !!r.bold, italic: !!r.italic });
+                });
+              });
+              flushBuffer(buf, indent);
+            }
+            function wrapRunsToLines(runs, indent){
+              let curW = indent||0; let buf=[]; const out=[];
+              const addOut = ()=>{ if (buf.length) out.push({ segments: buf.splice(0, buf.length), indent: indent||0 }); };
+              runs.forEach(r=>{
+                if (r.br){ addOut(); curW = indent||0; return; }
+                const parts = String(r.text||'').split(/(\s+)/);
+                parts.forEach(p=>{
+                  if (!p) return;
+                  const isSpace = /^(\s+)$/.test(p);
+                  if (isSpace && curW === (indent||0)) return; // skip leading spaces
+                  const w = measureTextWidth(pdf, p, { bold: !!r.bold, italic: !!r.italic });
+                  if (curW + w > maxWidth && buf.length){ addOut(); curW = indent||0; }
+                  buf.push({ text: p, style: { bold: !!r.bold, italic: !!r.italic } }); curW += w;
+                });
+              });
+              addOut();
+              return out;
+            }
+            elements.forEach(el=>{
+              if (el.type==='p'){
+                wrapRuns(el.runs, 0);
+                // paragraph gap
+                lines.push({ segments: [{ text:'', style:{} }], gapAfter:true, indent:0 });
+              } else if (el.type==='ul' || el.type==='ol'){
+                el.items.forEach((it, idx)=>{
+                  const bullet = el.type==='ol' ? (String(idx+1)+'. ') : '\u2022 ';
+                  const bW = measureTextWidth(pdf, bullet, { bold:false, italic:false });
+                  const out = wrapRunsToLines(it.runs, bW);
+                  if (out.length === 0){
+                    lines.push({ segments: [{ text: bullet, style:{} }], indent:0 });
+                  } else {
+                    out[0].segments.unshift({ text: bullet, style:{} });
+                    // first line should have no extra indent (so bullet starts at left), subsequent lines align under text
+                    out.forEach((ln, i)=>{ ln.indent = (i===0 ? 0 : bW); });
+                    out.forEach(ln=> lines.push(ln));
+                  }
+                });
+                lines.push({ segments: [{ text:'', style:{} }], gapAfter:true, indent:0 });
+              }
+            });
+            return lines;
+          }
+
+          function drawStyledLinesInBox(pdf, lines, boxX, boxY, boxW, bottom, padX, padY, lineH){
+            // returns final Y and remaining lines if page break was needed
+            const contentW = Math.max(20, boxW - padX*2);
+            let curY = boxY + padY + 3.6; let i=0;
+            while (i < lines.length){
+              if (curY + lineH > bottom){ break; }
+              const line = lines[i];
+              let curX = boxX + padX + (line.indent || 0);
+              line.segments.forEach(seg=>{
+                const s = seg.style||{}; const st = s.bold && s.italic ? 'bolditalic' : (s.bold ? 'bold' : (s.italic ? 'italic' : 'normal'));
+                const color = (s.color && /^#/.test(s.color)) ? s.color : null;
+                if (color){
+                  const [r,g,b] = (function(hex){ hex=hex.replace('#',''); if(hex.length===3){hex=hex.split('').map(c=>c+c).join('');} return [parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)]; })(color);
+                  pdf.setTextColor(r,g,b);
+                } else { pdf.setTextColor(17,24,39); }
+                pdf.setFont('helvetica', st); pdf.setFontSize(10);
+                const w = measureTextWidth(pdf, seg.text||'', s);
+                pdf.text(seg.text||'', curX, curY);
+                if (s.underline){ pdf.setDrawColor(17); pdf.setLineWidth(0.2); pdf.line(curX, curY + 0.8, curX + w, curY + 0.8); }
+                curX += w;
+              });
+              curY += lineH;
+              if (line.gapAfter) curY += 2;
+              i++;
+            }
+            return { y: curY, consumed: i };
+          }
+
+          function drawLabeledHtmlBlock(pdf, ctx, label, html, x, y, maxW){
+            const padX = 2.5, padY = 1.6, r = 2.2, gap = 1.8;
+            const { page, margin, contentW, pr, pg, pb } = ctx;
+            const bottom = page.h - margin - 6;
+            const boxX = margin; const boxW = contentW; const lineHLocal = 4.8;
+            // heading chip
+            pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5);
+            const chipW = pdf.getTextWidth(label) + padX*2, chipH = 5.6;
+            const minBlockH = chipH + gap + (lineHLocal + padY*2);
+            if (y + minBlockH > bottom){ pdf.addPage(); y = margin + 6; }
+
+            pdf.setFillColor(255,255,255); pdf.setDrawColor(255,255,255);
+            pdf.roundedRect(x, y, chipW, chipH, 1.6, 1.6, 'F');
+            pdf.setTextColor(pr,pg,pb); pdf.text(label, x + padX, y + chipH - 1.8);
+
+            const elements = parseHtmlToElements(html);
+            let lines = wrapElementsToLines(pdf, elements, Math.max(20, boxW - padX*2));
+
+            let curY = y + chipH + gap;
+            while (lines.length){
+              // compute how many lines fit
+              let avail = bottom - curY;
+              let maxLines = Math.floor((avail - padY*2) / lineHLocal);
+              if (maxLines <= 0){ pdf.addPage(); curY = margin + 6; continue; }
+              const use = lines.slice(0, maxLines);
+              const boxH = use.length * lineHLocal + padY*2 + (use.some(l=>l.gapAfter)?2:0);
+              pdf.setFillColor(255,255,255);
+              pdf.roundedRect(boxX, curY, boxW, boxH, r, r, 'F');
+              const res = drawStyledLinesInBox(pdf, use, boxX, curY, boxW, bottom, padX, padY, lineHLocal);
+              curY = res.y + 3; // gap between continued boxes
+              lines = lines.slice(res.consumed);
+              if (lines.length){ pdf.addPage(); curY = margin + 6; }
+            }
+            return curY;
+          }
+          function pickPrimary(){
+            const raw = meta.palette.find(x => x) || getComputedStyle(document.documentElement).getPropertyValue('--role-primary-500') || '#4a86e8';
+            return (raw.trim().startsWith('#') ? raw.trim() : ('#' + raw.trim()));
+          }
+
+          async function imageToDataUrl(imgEl){
+            if (!imgEl.complete || !imgEl.naturalWidth){
+              await new Promise(res => imgEl.addEventListener('load', res, { once:true }));
+            }
+            const cnv = document.createElement('canvas');
+            cnv.width = imgEl.naturalWidth; cnv.height = imgEl.naturalHeight;
+            const ctx = cnv.getContext('2d'); ctx.drawImage(imgEl, 0, 0);
+            return { dataUrl: cnv.toDataURL('image/jpeg', 0.95), w: cnv.width, h: cnv.height };
+          }
+
+          async function svgToPngDataUrl(url, targetWpx){
+            return new Promise((resolve, reject) => {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.onload = () => {
+                try{
+                  const w = targetWpx || img.width || 320;
+                  const h = Math.round(w * (img.height/img.width || 0.3) || w*0.3);
+                  const cnv = document.createElement('canvas'); cnv.width = w; cnv.height = h;
+                  const ctx = cnv.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+                  resolve({ dataUrl: cnv.toDataURL('image/png'), w, h });
+                }catch(e){ reject(e); }
+              };
+              img.onerror = reject;
+              img.src = url;
+            });
+          }
+
+          async function imageUrlToDataUrl(url){
+            return new Promise((resolve, reject) => {
+              const im = new Image();
+              im.crossOrigin = 'anonymous';
+              im.onload = async () => {
+                try{
+                  const cnv = document.createElement('canvas');
+                  cnv.width = im.naturalWidth; cnv.height = im.naturalHeight;
+                  const ctx = cnv.getContext('2d'); ctx.drawImage(im, 0, 0);
+                  resolve({ dataUrl: cnv.toDataURL('image/jpeg', 0.95), w: cnv.width, h: cnv.height });
+                }catch(e){ reject(e); }
+              };
+              im.onerror = reject;
+              im.src = url;
+            });
+          }
+
+          async function generatePdf(mode){
+            try{
+              if (!(window.jspdf && window.jspdf.jsPDF)){ alert('PDF Bibliothek konnte nicht geladen werden.'); return; }
+              const { jsPDF } = window.jspdf;
+              const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
+              const page = { w: pdf.internal.pageSize.getWidth(), h: pdf.internal.pageSize.getHeight() }, margin = 12, contentW = page.w - margin*2;
+              const innerX = margin; // start at body container left
+              const innerW = contentW; // use full body container width
+
+              const primaryHex = pickPrimary();
+              const [pr,pg,pb] = hexToRgb(primaryHex);
+              const ctx = { page, margin, contentW, pr, pg, pb };
+              const lineH = 4.8;
+
+              let didPageBreak = false;
+              function drawLabeledBlock(label, value, x, y, maxW){
+                if (!value) return y;
+                const padX = 2.5, padY = 1.6, r = 2.2, gap = 1.8;
+                const bottom = page.h - margin - 6;
+                const toText = (v) => String(v == null ? '' : v);
+                // Full-width box inside body container
+                const boxX = margin;
+                const boxW = contentW;
+                const contentWidth = Math.max(20, boxW - padX*2);
+                const lines = pdf.splitTextToSize(toText(value), contentWidth);
+
+                // measure chip
+                pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5);
+                const chipW = pdf.getTextWidth(label) + padX*2, chipH = 5.6;
+
+                // Ensure heading and first line start on same page
+                const minBlockH = chipH + gap + (lineH + padY*2);
+                if (y + minBlockH > bottom){
+                  pdf.addPage(); didPageBreak = true; y = margin + 6;
+                }
+
+                // Draw chip label once (on the first page only)
+                pdf.setFillColor(255,255,255); pdf.setDrawColor(255,255,255);
+                pdf.roundedRect(x, y, chipW, chipH, 1.6, 1.6, 'F');
+                pdf.setTextColor(pr,pg,pb);
+                pdf.text(label, x + padX, y + chipH - 1.8);
+
+                // Paginate content box across pages if needed
+                let i = 0; // line index
+                let curY = y + chipH + gap;
+                pdf.setTextColor(17,24,39); pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
+                while (i < lines.length){
+                  const avail = bottom - curY;
+                  const maxLinesThisPage = Math.floor((avail - padY*2) / lineH);
+                  if (maxLinesThisPage <= 0){
+                    pdf.addPage(); didPageBreak = true; curY = margin + 6; continue;
+                  }
+                  const slice = lines.slice(i, i + maxLinesThisPage);
+                  const boxH = slice.length * lineH + padY*2;
+                  pdf.setFillColor(255,255,255);
+                  pdf.roundedRect(boxX, curY, boxW, boxH, r, r, 'F');
+                  let ty = curY + padY + 3.6;
+                  slice.forEach(t => { pdf.text(t, boxX + padX, ty); ty += lineH; });
+                  i += slice.length;
+                  curY += boxH + 3; // small gap between continued boxes
+                  if (i < lines.length){
+                    // Need more space, go to next page for continuation
+                    pdf.addPage(); didPageBreak = true; curY = margin + 6;
+                  }
+                }
+                return curY;
+              }
+
+              // Header
+              const headerH = 40;
+              const titleOrig = (container?.dataset.title || 'Storyboard');
+              pdf.setFillColor(pr,pg,pb);
+              pdf.rect(0,0,page.w,headerH,'F');
+
+              // (Title removed from header; will be rendered as a labeled block below)
+
+              // University logo (top-left)
+              try {
+                const logo = await svgToPngDataUrl(`${PATH_BASE}/images/logo_header_white.svg`, 2000);
+                const ratio = logo.h / logo.w;
+                const logoWmm = 70; // larger for better visibility
+                const logoHmm = logoWmm * ratio;
+                const lx = margin + 3; const ly = Math.max(2, (headerH - logoHmm) / 2);
+                pdf.addImage(logo.dataUrl, 'PNG', lx, ly, logoWmm, logoHmm);
+              } catch {}
+
+              // Palette: prepare values for later rendering (inside meta block)
+              const sw = 6.2, gap = 2.8, MAX_SWATCHES = 8;
+              const palette = meta.palette.slice(0, MAX_SWATCHES).map(h => h.startsWith('#')?h:'#'+h);
+
+              // Body container
+              const bodyTop = headerH + 6;
+              pdf.setFillColor(248,250,252);
+              pdf.roundedRect(margin, bodyTop, contentW, page.h - bodyTop - 12, 3, 3, 'F');
+
+              // Meta blocks (title included here, as requested)
+              let yCursor = bodyTop + 6;
+              const hasTitle = String(titleOrig||'').replace(/<[^>]*>/g,'').trim();
+              if (hasTitle) { yCursor = drawLabeledHtmlBlock(pdf, ctx, 'Titel', String(titleOrig||''), innerX, yCursor, innerW); yCursor += 3; }
+              const hasDesc = String(meta.desc||'').replace(/<[^>]*>/g,'').trim();
+              if (hasDesc) { yCursor = drawLabeledHtmlBlock(pdf, ctx, 'Beschreibung', String(meta.desc||''), innerX, yCursor, innerW); yCursor += 3; }
+              yCursor = drawLabeledBlock('Taxonomie', meta.taxo, innerX, yCursor, innerW); yCursor += 3;
+              const hasZg = String(meta.zg||'').replace(/<[^>]*>/g,'').trim();
+              if (hasZg) { yCursor = drawLabeledHtmlBlock(pdf, ctx, 'Zielgruppe', String(meta.zg||''), innerX, yCursor, innerW); yCursor += 3; }
+              const hasLz = String(meta.lz||'').replace(/<[^>]*>/g,'').trim();
+              if (hasLz) { yCursor = drawLabeledHtmlBlock(pdf, ctx, 'Lernziel', String(meta.lz||''), innerX, yCursor, innerW); }
+              // Palette block with swatches over hexes
+              function drawPaletteBlock(label, hexes, x, y, maxW){
+                const items = (hexes||[]).map(h => h && (h.startsWith('#')?h:'#'+h)).filter(Boolean);
+                if (!items.length) return y;
+                const padX = 2.5, padY = 1.6, r = 2.2, gapY = 6.0, gapX = 10.0;
+                // Ensure heading fits
+                pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5);
+                const chipW = pdf.getTextWidth(label) + padX*2, chipH = 5.6;
+                const bottom = page.h - margin - 6;
+                // compute cell width based on text width to avoid collisions
+                pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
+                const allowedContent = Math.max(20, (margin + contentW - x) - padX*2 - 1);
+                const cellW = Math.max(sw + 8, Math.max(...items.map(h => pdf.getTextWidth(h))) + 8);
+                const cellH = sw + 6.0 + 5.2; // swatch + larger gap + hex text line
+                // layout: wrap to multiple rows
+                const cols = Math.max(1, Math.floor((Math.min(maxW, allowedContent)) / (cellW + gapX)));
+                const rows = Math.ceil(items.length / cols);
+                const contentWpx = Math.min(Math.min(maxW, allowedContent), cols*cellW + (cols-1)*gapX);
+                const contentHpx = rows*cellH + (rows-1)*gapY;
+                const boxW = contentWpx + padX*2;
+                const boxH = contentHpx + padY*2;
+                const totalH = chipH + gapY + boxH;
+                if (y + totalH > bottom){ pdf.addPage(); didPageBreak = true; y = margin + 6; }
+                // Chip
+                pdf.setFillColor(255,255,255); pdf.setDrawColor(255,255,255);
+                pdf.roundedRect(x, y, chipW, chipH, 1.6, 1.6, 'F');
+                pdf.setTextColor(pr,pg,pb); pdf.text(label, x + padX, y + chipH - 1.8);
+                // Box
+                const boxX = x, boxY = y + chipH + gapY;
+                pdf.setFillColor(255,255,255); pdf.roundedRect(boxX, boxY, boxW, boxH, r, r, 'F');
+                // Content
+                pdf.setDrawColor(255,255,255);
+                let idx = 0;
+                for (let r = 0; r < rows; r++){
+                  for (let c = 0; c < cols && idx < items.length; c++, idx++){
+                    const hex = items[idx];
+                    const [r1,g1,b1] = hexToRgb(hex);
+                    const cx = boxX + padX + c*(cellW + gapX);
+                    const cy = boxY + padY + r*(cellH + gapY);
+                    const swX = cx + (cellW - sw)/2; // center swatch in cell
+                    pdf.setFillColor(r1,g1,b1);
+                    pdf.roundedRect(swX, cy, sw, sw, 1, 1, 'FD');
+                    pdf.setTextColor(15,23,42); pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
+                    pdf.text(hex, cx + cellW/2, cy + sw + 4.6, { align: 'center' });
+                  }
+                }
+                return boxY + boxH;
+              }
+              if (palette && palette.length){ yCursor += 2; yCursor = drawPaletteBlock('Palette', palette, innerX, yCursor, innerW); }
+              yCursor += 6;
+
+              // If any block required a page break, place the image on a fresh page after the text
+              if (didPageBreak){ pdf.addPage(); yCursor = margin + 6; didPageBreak = false; }
+
+              // Scene title above image (current scene)
+              try {
+                const sceneNode = qa('.scene-item').find(x => parseInt(x.dataset.sceneId,10)===currentSceneId);
+                const sceneLabel = sceneNode?.dataset.name || (`Szene ${sceneNode?.dataset.number||''}`);
+                if (sceneLabel){ pdf.setTextColor(pr,pg,pb); pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.text(sceneLabel, margin + 2, yCursor); yCursor += 6; }
+              } catch {}
+
+              // Base image
+              const currentImgUrl = qa('.scene-item').find(x => parseInt(x.dataset.sceneId,10)===currentSceneId)?.querySelector('img')?.src;
+              const snap = (mode==='all' && currentImgUrl) ? await imageUrlToDataUrl(currentImgUrl) : await imageToDataUrl(img);
+              const imgRatio = snap.w / snap.h;
+              let imgWmm = contentW - 12;
+              let imgHmm = imgWmm / imgRatio;
+              const bodyBottom = page.h - 12, safePad = 8, maxImgHmmHere = Math.max(40, bodyBottom - yCursor - safePad);
+              if (imgHmm > maxImgHmmHere){
+                if (maxImgHmmHere < 60){ pdf.addPage(); yCursor = margin + 6; }
+                const bodyBottom2 = page.h - 12;
+                const maxImgHmm = Math.max(40, bodyBottom2 - yCursor - safePad);
+                imgHmm = Math.min(imgHmm, maxImgHmm);
+                imgWmm = imgHmm * imgRatio;
+                if (imgWmm > contentW - 12) { imgWmm = contentW - 12; imgHmm = imgWmm / imgRatio; }
+              }
+              const imgX = margin + (contentW - imgWmm)/2, imgY = yCursor;
+              pdf.addImage(snap.dataUrl, 'JPEG', imgX, imgY, imgWmm, imgHmm);
+
+              // Vector markers on the image page
+              const dotR = 2.4, badgeH = 6.2, padXNum = 2.2;
+              pdf.setFont('helvetica','bold'); pdf.setFontSize(11.5);
+              markers.slice().sort((a,b)=> a.number - b.number || a.id - b.id).forEach(m => {
+                const colorHex = (m.colorHex || primaryHex);
+                const [r,g,b] = hexToRgb(colorHex);
+                const cx = imgX + (m.x || 0) * imgWmm;
+                const cy = imgY + (m.y || 0) * imgHmm;
+                pdf.setFillColor(r,g,b); pdf.setDrawColor(255,255,255); pdf.setLineWidth(0.6);
+                pdf.circle(cx, cy, dotR, 'FD');
+                const num = String(m.number ?? ''); const tw = pdf.getTextWidth(num);
+                const badgeW = Math.max(9, tw + padXNum*2);
+                const rightEdge = imgX + imgWmm;
+                const placeRight = (cx + dotR + 1.8 + badgeW <= rightEdge);
+                const bx = placeRight ? (cx + dotR + 1.8) : (cx - dotR - 1.8 - badgeW);
+                const by = cy - badgeH/2;
+                pdf.setFillColor(r,g,b); pdf.setDrawColor(255,255,255);
+                pdf.roundedRect(bx, by, badgeW, badgeH, 1.6, 1.6, 'FD');
+                pdf.setTextColor(255,255,255);
+                pdf.text(num, bx + badgeW/2, by + badgeH/2 + 1.6, { align: 'center' });
+              });
+
+              // Move marker details to a NEW page (image-only page above)
+              pdf.addPage();
+              let y = margin + 6;
+
+              
+
+              // Marker details (stacked full-width blocks)
+              const sorted = markers.slice().sort((a,b)=> a.number - b.number || a.id - b.id);
+              const bottom = page.h - 12;
+              let firstMarker = true;
+              sorted.forEach(m => {
+                // separator between markers
+                if (!firstMarker){
+                  if (y + 6 > bottom){ pdf.addPage(); y = margin + 6; }
+                  pdf.setDrawColor(226,232,240);
+                  pdf.line(margin+4, y, margin+contentW-4, y);
+                  y += 6;
+                }
+                // Section heading: Marker #N
+                if (y + 8 > bottom){ pdf.addPage(); y = margin + 6; }
+                pdf.setTextColor(15,23,42); pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+                pdf.text(`Marker #${String(m.number ?? '')}`, innerX, y);
+                y += 2;
+
+                // Fields in clear order (matching Viewer): Taxonomie, Ziel, Beschreibung, Datenablage, Quellen, Prompt-Idee, Reflexion – Notizen, Model
+                const taxo = (function(v){ const n = (typeof v === 'number' && v>=0) ? v : null; return n==null? '' : TAXO_NAMES.slice(0, Math.min(n+1, TAXO_NAMES.length)).join(', '); })(m.taxonomie);
+                const blocks = [
+                  ['Taxonomie', taxo, 'plain'],
+                  ['Ziel', String(m.ziel||''), 'html'],
+                  ['Beschreibung', String(m.description||''), 'html'],
+                  ['Datenablage', String(m.datenablage||''), 'plain'],
+                  ['Quellen', String(m.quellen||''), 'html'],
+                  ['Prompt-Idee', String(m.promptIdee||''), 'html'],
+                  ['Reflexion – Notizen', String(m.reflexion||''), 'html'],
+                  ['Model', String(m.model||''), 'plain'],
+                ];
+                blocks.forEach(([label, val, kind]) => {
+                  const has = (typeof val === 'string') ? val.replace(/<[^>]*>/g,'').trim() : String(val||'').trim();
+                  if (!has) return;
+                  if (kind==='html') y = drawLabeledHtmlBlock(pdf, ctx, label, val, innerX, y, innerW);
+                  else y = drawLabeledBlock(label, htmlToText(val), innerX, y, innerW);
+                  y += 2;
+                });
+                y += 4; // tail spacing
+                firstMarker = false;
+              });
+
+              // Append remaining scenes if requested
+              if (mode === 'all'){
+                const items = qa('.scene-item').map(el => ({
+                  id: parseInt(el.dataset.sceneId,10),
+                  number: parseInt(el.dataset.number,10) || 0,
+                  name: el.dataset.name || '',
+                  url: el.querySelector('img')?.src || ''
+                })).filter(x=>!Number.isNaN(x.id));
+                const rest = items.sort((a,b)=> a.number-b.number || a.id-b.id).filter(x=>x.id!==currentSceneId);
+
+                for (const sc of rest){
+                  // Header + body bg
+                  pdf.addPage();
+                  pdf.setFillColor(pr,pg,pb); pdf.rect(0,0,page.w,headerH,'F');
+                  try {
+                    const logo = await svgToPngDataUrl(`${PATH_BASE}/images/logo_header_white.svg`, 2000);
+                    const ratio = logo.h / logo.w; const logoWmm = 70; const logoHmm = logoWmm * ratio;
+                    const lx = margin + 3; const ly = Math.max(2, (headerH - logoHmm) / 2);
+                    pdf.addImage(logo.dataUrl, 'PNG', lx, ly, logoWmm, logoHmm);
+                  } catch {}
+                  const bodyTop2 = headerH + 6;
+                  pdf.setFillColor(248,250,252);
+                  pdf.roundedRect(margin, bodyTop2, contentW, page.h - bodyTop2 - 12, 3, 3, 'F');
+
+                  // Scene image
+                  const snap2 = sc.url ? await imageUrlToDataUrl(sc.url) : null;
+                  if (snap2){
+                    let yCur = bodyTop2 + 6;
+                    // Scene title above image (this scene)
+                    if (sc.name){ pdf.setTextColor(pr,pg,pb); pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.text(sc.name, margin + 2, yCur); yCur += 6; }
+                    const ratio2 = snap2.w / snap2.h;
+                    let w2 = contentW - 12; let h2 = w2 / ratio2;
+                    const bottom2 = page.h - 12, safe2 = 8, maxH2 = Math.max(40, bottom2 - yCur - safe2);
+                    if (h2 > maxH2){ if (maxH2 < 60){ pdf.addPage(); yCur = margin + 6; }
+                      const bottom3 = page.h - 12; const maxH3 = Math.max(40, bottom3 - yCur - safe2);
+                      h2 = Math.min(h2, maxH3); w2 = h2 * ratio2; if (w2 > contentW - 12){ w2 = contentW - 12; h2 = w2 / ratio2; }
+                    }
+                    const x2 = margin + (contentW - w2)/2, y2 = yCur;
+                    pdf.addImage(snap2.dataUrl, 'JPEG', x2, y2, w2, h2);
+
+                    // Overlay markers
+                    const mk = (await API.list(sc.id)).map(N);
+                    const dotR2 = 2.4, badgeH2 = 6.2, padX2 = 2.2;
+                    pdf.setFont('helvetica','bold'); pdf.setFontSize(11.5);
+                    mk.slice().sort((a,b)=> a.number-b.number || a.id-b.id).forEach(m => {
+                      const colorHex = (m.colorHex || primaryHex); const [r,g,b] = hexToRgb(colorHex);
+                      const cx = x2 + (m.x || 0) * w2; const cy = y2 + (m.y || 0) * h2;
+                      pdf.setFillColor(r,g,b); pdf.setDrawColor(255,255,255); pdf.setLineWidth(0.6);
+                      pdf.circle(cx, cy, dotR2, 'FD');
+                      const num = String(m.number ?? ''); const tw = pdf.getTextWidth(num);
+                      const badgeW = Math.max(9, tw + padX2*2);
+                      const rightEdge = x2 + w2; const placeRight = (cx + dotR2 + 1.8 + badgeW <= rightEdge);
+                      const bx = placeRight ? (cx + dotR2 + 1.8) : (cx - dotR2 - 1.8 - badgeW);
+                      const by = cy - badgeH2/2;
+                      pdf.setFillColor(r,g,b); pdf.setDrawColor(255,255,255);
+                      pdf.roundedRect(bx, by, badgeW, badgeH2, 1.6, 1.6, 'FD');
+                      pdf.setTextColor(255,255,255); pdf.text(num, bx + badgeW/2, by + badgeH2/2 + 1.6, { align: 'center' });
+                    });
+
+                    // Details page
+                    pdf.addPage();
+                    let yD = margin + 6; const bottomD = page.h - 12;
+                    let first = true;
+                    mk.slice().sort((a,b)=> a.number-b.number || a.id-b.id).forEach(m => {
+                      if (!first){ if (yD + 6 > bottomD){ pdf.addPage(); yD = margin + 6; }
+                        pdf.setDrawColor(226,232,240); pdf.line(margin+4, yD, margin+contentW-4, yD); yD += 6; }
+                      if (yD + 8 > bottomD){ pdf.addPage(); yD = margin + 6; }
+                      pdf.setTextColor(15,23,42); pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+                      pdf.text(`Marker #${String(m.number ?? '')}`, innerX, yD); yD += 2;
+                      const taxo = (function(v){ const n = (typeof v === 'number' && v>=0) ? v : null; return n==null? '' : TAXO_NAMES.slice(0, Math.min(n+1, TAXO_NAMES.length)).join(', '); })(m.taxonomie);
+                      const blocks = [
+                        ['Taxonomie', taxo],
+                        ['Ziel', htmlToText(m.ziel)],
+                        ['Beschreibung', htmlToText(m.description)],
+                        ['Datenablage', String(m.datenablage||'')],
+                        ['Quellen', htmlToText(m.quellen)],
+                        ['Prompt-Idee', htmlToText(m.promptIdee)],
+                        ['Reflexion – Notizen', htmlToText(m.reflexion)],
+                        ['Model', String(m.model||'')]
+                      ];
+                      blocks.forEach(([label, val]) => { if (String(val||'').trim()) { yD = drawLabeledBlock(label, val, innerX, yD, innerW); yD += 2; } });
+                      yD += 4; first = false;
+                    });
+                  }
+                }
+              }
+
+              // Declaration page
+              pdf.addPage();
+              let yDecl = margin + 6;
+              pdf.setTextColor(pr,pg,pb); pdf.setFont('helvetica','bold'); pdf.setFontSize(14);
+              pdf.text('Erklärung zur Freigabe unter Open-Source-Lizenz', margin, yDecl); yDecl += 8;
+
+              pdf.setTextColor(33); pdf.setFont('helvetica','normal'); pdf.setFontSize(11);
+              const wrap = (t) => pdf.splitTextToSize(String(t||''), page.w - margin*2);
+              const p1 = 'Ich / Wir, die unterzeichnende(n) Autor:in(nen), erkläre(n) hiermit, dass das Storyboard für das Lernmodul sowie das daraus erstellte Lernmodul von mir / uns erstellt wurde und frei von Rechten Dritter ist.';
+              const p2 = 'Ich / Wir stelle(n) diese Werke hiermit unter die unten genannte Lizenz. Damit werden die Werke der Allgemeinheit zur freien Nutzung, Verbreitung, Bearbeitung und Veröffentlichung zugänglich gemacht. Eine Nutzung ist ohne Einschränkungen gemäß der Lizenzbestimmung erlaubt.';
+              wrap(p1).forEach(line => { pdf.text(line, margin, yDecl); yDecl += 5.2; });
+              yDecl += 2;
+              wrap(p2).forEach(line => { pdf.text(line, margin, yDecl); yDecl += 5.2; });
+              yDecl += 6;
+
+              const licText = (function(key){
+                switch((key || '').trim()){
+                  case 'Attribution_CC_BY': return 'Attribution (CC BY)';
+                  case 'Attribution_ShareAlike_CC_BY_SA': return 'Attribution-ShareAlike (CC BY-SA)';
+                  case 'Public_Domain_Dedication_CC0': return 'CC0 1.0 – Public Domain Dedication';
+                  case 'Copyright': return 'Copyright';
+                  case 'MIT': return 'MIT';
+                  default: return '';
+                }
+              })(meta.license);
+
+              const kv = (label, value) => {
+                const full = (label + ' ' + (value||'')).trim();
+                const lines = wrap(full);
+                lines.forEach(ln => { pdf.text(ln, margin, yDecl); yDecl += 5.2; });
+              };
+              // For the declaration page, the work title must be plain text (no HTML tags)
+              const plainTitleForDecl = htmlToText(meta.title);
+              kv('Titel des Werks:', plainTitleForDecl);
+              kv('Lizenzbestimmung:', licText);
+              if ((meta.lextras||'').trim()) { kv('Zusatz zur Lizenz:', meta.lextras); }
+              yDecl += 6;
+
+              pdf.setFont('helvetica','bold');
+              pdf.text('Autor:in / Autor:innen:', margin, yDecl);
+              yDecl += 6;
+              pdf.setFont('helvetica','normal');
+              const authors = Array.isArray(meta.authors) ? meta.authors : [];
+              if (authors.length > 0){
+                authors.forEach(name => {
+                  const nm = String(name||'').trim();
+                  if (nm){ pdf.text(nm, margin, yDecl); yDecl += 19; }
+                  pdf.text('Ort, Datum, Unterschrift', margin, yDecl); yDecl += 12;
+                });
+              } else {
+                for (let i=0;i<3;i++) {
+                  pdf.text('Name', margin, yDecl); yDecl += 19;
+                  pdf.text('Ort, Datum, Unterschrift', margin, yDecl); yDecl += 12;
+                }
+              }
+
+              const total = pdf.getNumberOfPages();
+              for (let i=1;i<=total;i++){
+                pdf.setPage(i);
+                pdf.setFontSize(9); pdf.setTextColor(100);
+                pdf.text(`Seite ${i} / ${total}`, page.w - margin, page.h - 6, { align: 'right' });
+                pdf.setDrawColor(226,232,240); pdf.line(margin, page.h - 10, page.w - margin, page.h - 10);
+              }
+
+              const fileTitle = (meta.title || 'Storyboard').replace(/[\\/:*?"<>|]+/g,'_');
+              pdf.save(`${fileTitle}.pdf`);
+            } catch(err){
+              console.error(err); alert('Export fehlgeschlagen. Details in der Konsole.');
+            }
+          }
+
+          // PDF dropdown + actions
+          (function initPdfDropdown(){
+            const dd = document.getElementById('printDd');
+            const btn = document.getElementById('printBtn');
+            const optCur = document.getElementById('printOptCurrent');
+            const optAll = document.getElementById('printOptAll');
+            if (!dd || !btn) return;
+            let open = false;
+            function setOpen(v){ open = v; dd.classList.toggle('open', !!v); }
+            btn.addEventListener('click', (e)=>{ e.stopPropagation(); setOpen(!open); });
+            document.addEventListener('click', ()=> setOpen(false));
+            document.addEventListener('keydown', (e)=>{ if (e.key==='Escape') setOpen(false); });
+            optCur?.addEventListener('click', (e)=>{ e.stopPropagation(); setOpen(false); generatePdf('current'); });
+            optAll?.addEventListener('click', (e)=>{ e.stopPropagation(); setOpen(false); generatePdf('all'); });
+          })();
+
+          // Init
+          (async function init(){
+            if (!currentSceneId) return;
+            const data = await API.list(currentSceneId);
+            markers = data.map(N);
+            statusCount.textContent = `${markers.length} Marker`;
+            renderOverlay(); renderList(); fitAfterImage();
+          })();
+
+          qa('.scene-item').forEach(div => div.addEventListener('click', ()=> loadScene(parseInt(div.dataset.sceneId))));
+          window.addEventListener('resize', () => renderOverlay());
+        })();
+    </script>
+}

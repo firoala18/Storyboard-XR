@@ -1,0 +1,725 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+@using Microsoft.AspNetCore.Identity
+@* @using ProjectsWebApp.DataAccsess.Services.Interfaces *@
+@inject SignInManager<IdentityUser> SignInManager
+@* @inject IContactEmailService ContactEmailService *@
+@inject UserManager<IdentityUser> UserManager
+
+
+
+<!--
+    
+/*
+ * Copyright (c) 2025 Bergische Universität Wuppertal – ZIM MediaLab: Dr. Heike Seehagen-Marx
+ *
+ * Förderung: Stiftung Innovation in der Hochschullehre - Projekt ProviLe
+ *
+ * Project: StoryBoard 
+ *
+ * Project Lead, Concept, UX, Design & Didactics:
+ *   Dr. Heike Seehagen-Marx
+ *
+ * Technical Development:
+ *   Firas Alaammar
+ *
+ * Production:
+ *   ZIM MediaLab, Bergische Universität Wuppertal
+ *
+ * ------------------------------------------------------------
+ * All rights reserved.
+ * This software and its associated files are protected by copyright law.
+ * Any use, reproduction, modification, or distribution without written
+ * permission from the copyright holder is strictly prohibited.
+ * ------------------------------------------------------------
+ */
+-->
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] </title>
+    <!-- ✅ Descriptive meta -->
+    <meta name="author" content="Firas Alaammar — Full-Stack Entwickler; Dr. Heike Seehagen-Marx — Projektleitung, Konzept, UX, Design & Didaktik">
+    <meta name="creator" content="ZIM MediaLab, Bergische Universität Wuppertal">
+    <meta name="description" content="MediaLab: Story Board — Ein kreatives didaktisches Werkzeug. Projektleitung: Dr. Heike Seehagen-Marx. Full-Stack Entwicklung: Firas Alaammar.">
+    <meta name="keywords" content="Story Board, StoryDesign, Didaktik, ProviLe, Bergische Universität Wuppertal, ZIM MediaLab, Firas Alaammar, Heike Seehagen-Marx">
+
+    <!-- ✅ Open Graph -->
+    <meta property="og:title" content="MediaLab: Story Board">
+    <meta property="og:description" content="Didaktisches Denken sichtbar machen. Projektleitung: Dr. Heike Seehagen-Marx. Full-Stack Entwicklung: Firas Alaammar.">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="de_DE">
+    <meta property="og:url" content="https://medienlabor.uni-wuppertal.de/apps/storyboard/">
+    <meta property="og:image" content="@($"{Context.Request.Scheme}://{Context.Request.Host}{Url.Content("~/Storyboard_Logo.png")}")">
+
+    <!-- ✅ Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MediaLab: Story Board">
+    <meta name="twitter:description" content="Projektleitung: Dr. Heike Seehagen-Marx. Full-Stack Entwicklung: Firas Alaammar.">
+    <meta name="twitter:image" content="@($"{Context.Request.Scheme}://{Context.Request.Host}{Url.Content("~/Storyboard_Logo.png")}")">
+
+    <!-- in <head> -->
+    <script type="application/ld+json">
+        {
+          "@@context": "https://schema.org",
+          "@@type": "WebApplication",
+          "name": "MediaLab: Story Board",
+          "url": "https://medienlabor.uni-wuppertal.de/apps/storyboard/",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "Web",
+          "inLanguage": "de",
+          "isAccessibleForFree": true,
+          "description": "Ein kreatives, didaktisches Werkzeug im Projekt ProviLe.",
+          "publisher": {
+            "@@type": "Organization",
+            "name": "Bergische Universität Wuppertal – ZIM MediaLab"
+          },
+          "creator": {
+            "@@type": "Person",
+            "name": "Dr. Heike Seehagen-Marx",
+            "jobTitle": "Projektleitung, Konzept, UX, Design & Didaktik",
+            "affiliation": {
+              "@@type": "Organization",
+              "name": "ZIM MediaLab, Bergische Universität Wuppertal"
+            }
+          },
+          "contributor": [
+            {
+              "@@type": "Person",
+              "name": "Firas Alaammar",
+              "jobTitle": "Full-Stack Entwickler"
+            },
+            {
+              "@@type": "Organization",
+              "name": "ZIM MediaLab, Bergische Universität Wuppertal"
+            }
+          ],
+          "copyrightHolder": {
+            "@@type": "Organization",
+            "name": "Bergische Universität Wuppertal – ZIM MediaLab"
+          },
+          "copyrightYear": @DateTime.Now.Year
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+          "@@context": "https://schema.org",
+          "@@type": "Person",
+          "name": "Dr. Heike Seehagen-Marx",
+          "jobTitle": "Projektleitung, Konzept, UX, Design & Didaktik",
+          "affiliation": { "@@type": "Organization", "name": "ZIM MediaLab, Bergische Universität Wuppertal" }
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+          "@@context": "https://schema.org",
+          "@@type": "Person",
+          "name": "Firas Alaammar",
+          "jobTitle": "Full-Stack Entwickler",
+          "affiliation": { "@@type": "Organization", "name": "ZIM MediaLab, Bergische Universität Wuppertal" }
+        }
+    </script>
+
+
+    <link rel="icon" type="image/x-icon" href="/logo-PromptCoach-transparenz.svg">
+
+  <base href="@Context.Request.PathBase/" />
+
+
+    <!-- ✅ Bootstrap 5 -->
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+
+    <!-- ✅ Toastr & DataTables -->
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
+    <link rel="stylesheet" href="//cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css">
+
+    <!-- ✅ Font Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="..." crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- ✅ CKEditor 5 -->
+    <script src="https://cdn.ckeditor.com/ckeditor5/37.1.0/classic/ckeditor.js"></script>
+
+    <!-- ✅ Load jQuery first, then jQuery UI (CDN version) -->
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+    <!-- ✅ SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="~/css/lernpfad.css" asp-append-version="true" />
+
+
+</head>
+
+
+<style>
+    :root {
+        --primary-dark: #191919;
+        --primary-light: #f1f1f1;
+        --accent-color: #4e9a51;
+        --light-gray: #e0e0e0;
+    }
+    /* Ensure the thin top toolbar sits above any overlapping navbar/logo on desktop */
+    .top-toolbar {
+        position: relative;
+        z-index: 1100;
+    }
+
+    header .navbar {
+        position: relative;
+        z-index: 1000;
+    }
+    .active-nav-link {
+        border-bottom: 3px solid white;
+    }
+
+    /* Improved Footer Styles */
+    .footer {
+        background-color: #89ba17;
+        color: #e0e0e0;
+        /* padding: 3rem 0 1.5rem; */
+        font-size: 0.95rem;
+      
+    }
+
+        .footer a {
+            color: #e0e0e0;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+            .footer a:hover {
+                color: #ffffff;
+                text-decoration: underline;
+            }
+
+    .footer-title {
+        display: inline-block; /* shrink to text width */
+        color: #fff;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.25rem; /* less bottom space */
+        font-size: 1.1rem;
+        position: relative;
+        
+    }
+
+        /* green underline */
+        .footer-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%; /* center horizontally */
+            transform: translateX(-50%);
+            width: 30px;
+            height: 2px;
+           
+            background-color: var(--accent-color);
+        }
+
+
+    .footer-links {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+        .footer-links li {
+            margin-bottom: 0.7rem;
+        }
+
+            .footer-links li:last-child {
+                margin-bottom: 0;
+            }
+
+    .footer-divider {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin: 2rem 0;
+    }
+
+    .footer-bottom {
+        padding-top: 1.5rem;
+        text-align: center;
+        color: #aaa;
+        font-size: 0.85rem;
+    }
+
+    .footer-logo {
+        max-height: 90px;
+        width: auto;
+        margin-bottom: 1rem;
+        opacity: 0.9;
+        transition: opacity 0.3s;
+    }
+
+        .footer-logo:hover {
+            opacity: 1;
+        }
+
+
+
+    .legal-links {
+        display: flex;
+        justify-content: center;
+        gap: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+        .legal-links a {
+            position: relative;
+            padding: 0 0.5rem;
+        }
+
+            .legal-links a:not(:last-child)::after {
+                content: "•";
+                position: absolute;
+                right: -1rem;
+                color: rgba(255, 255, 255, 0.3);
+            }
+
+
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .footer .col-md-4
+
+    {
+        margin-bottom: 2rem;
+    }
+
+    .footer-title::after {
+        width: 30px;
+    }
+
+    .legal-links {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+        .legal-links a:not(:last-child)::after {
+            display: none;
+        }
+
+    }
+
+
+</style>
+
+
+<body class="d-flex flex-column min-vh-100">
+    <!-- Wrapper section -->
+    @{ var wrapSectionClass = (ViewBag.FullWidth as bool? == true) ? "section section-full" : "section"; }
+    <section class="@wrapSectionClass">
+        <!-- 1) Thin top toolbar -->
+        <div class="bg-light border-bottom top-toolbar" style="min-height: 40px;">
+            <div class="d-flex flex-wrap justify-content-end align-items-center" style="min-height: 40px; background:white;">
+
+
+                <!-- Übersicht Link styled as Button -->
+                <a class="btn btn-link text-dark uebersicht-btn d-flex align-items-center flex-wrap"
+                   asp-controller="Home" asp-area="user" asp-action="Uebersicht"
+                   style="text-decoration: none; color: black; font-size: 1rem;">
+                    <span>Übersicht</span>
+                </a>
+
+
+
+                <!-- Kontrast Button -->
+                <button class="btn btn-link text-dark kontrast-btn" id="toggleContrast" style="text-decoration: none;">
+                    <img src= "@Url.Content("~/images/Kontrast.svg")"  alt="Kontrast Icon" style="width: 30px; height: 30px;" />
+                    <span class="d-none d-sm-inline">Kontrast</span>
+                </button>
+
+
+                <!-- Schriftgröße Dropdown -->
+                <div class="dropdown">
+                    <button class="btn btn-link text-dark dropdown-toggle" type="button" id="fontSizeDropdown"
+                            data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none;">
+                        <i class="fas fa-font me-1"></i> <span class="d-none d-sm-inline">Schriftgröße</span>
+                    </button>
+
+                    <ul class="dropdown-menu dropdown-menu-end p-3" aria-labelledby="fontSizeDropdown" style="min-width: 220px;">
+                        <li>
+                            <label for="fontSlider" class="form-label mb-1">Textgröße:</label>
+                            <input type="range" id="fontSlider" min="80" max="150" step="5" value="100" class="form-range" />
+                            <div class="text-end small text-muted" id="fontValueLabel">100%</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Leichte Sprache Link styled as Button -->
+                <a class="btn btn-link text-dark me-2 leichteSprache-btn"
+                   asp-controller="Home" asp-area="user" asp-action="Leichtesprache"
+                   style="text-decoration: none; color: black;">
+                    <span class="d-inline-block btn">
+                        <img src= "@Url.Content("~/images/Leichte_sprache_logo.svg")" alt="Leichte Sprache Icon" style="width: 16px; height: 16px; margin-right: 8px;" />
+                        <span class="d-none d-sm-inline">Leichte Sprache</span>
+                    </span>
+
+                </a>
+
+            </div>
+        </div>
+
+
+        <!-- 2) Green Navbar with Responsive Behavior -->
+        <header>
+            <nav class="navbar navbar-expand-lg" style="background-color: #89ba17;" data-bs-theme="dark">
+               
+                <div class="container-fluid ps-3 ps-md-4 ">
+
+                    <a class="navbar-brand me-auto ps-md-4 ps-lg-5" href="https://www.uni-wuppertal.de/de/">
+                        <img src="@Url.Content("~/images/logo_header_white.svg")" style="height: 90px; width: auto; margin: 0 8px 0 0;" alt="App Logo" class="img-fluid brand-logo" />
+                    </a>
+
+                    <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+
+                    <div class="collapse navbar-collapse" id="mainNavbar">
+
+                        <ul class="navbar-nav me-auto d-flex align-items-center gap-3 mb-0">
+                            <li class="nav-item mx-2">
+                                <!-- Removed <br/> and added flex alignment -->
+                              <a class="nav-link text-light d-flex align-items-center @IsActive("Home", "Home")"
+                                asp-area="User"
+                                asp-controller="Home"
+                                asp-action="Home"
+                                   style="height:50px; white-space: nowrap;">
+                                Über das Board
+                                </a>
+
+                            </li>
+
+                   
+                            <li class="nav-item mx-2">
+                                @if (User?.Identity?.IsAuthenticated ?? false)
+                                {
+                                    <a class="nav-link text-light d-flex align-items-center @IsActive("Storyboards", "Index")"
+                                       asp-area="User" asp-controller="Storyboards" asp-action="Index"
+                                       style="height:50px; white-space: nowrap;">
+                                        Story Board
+                                    </a>
+                                }
+                                else
+                                {
+                                    <a class="nav-link text-light d-flex align-items-center @(Context.Request.Path.StartsWithSegments("/s") ? "active" : "")"
+                                       asp-area="User" asp-controller="PublicStoryboards" asp-action="My"
+                                       style="height:50px; white-space: nowrap;">
+                                        Story Board
+                                    </a>
+                                }
+                            </li>
+
+                            <!-- <li class="nav-item mx-2">
+                                @if (User?.Identity?.IsAuthenticated ?? false)
+                                {
+                                    <a class="nav-link text-light d-flex align-items-center @IsActive("Lernpfad", "Index")"
+                                       asp-area="User"
+                                       asp-controller="Lernpfad"
+                                       asp-action="Index"
+                                       style="height:50px; white-space: nowrap;">
+                                        Lernpfad
+                                    </a>
+                                }
+                                else
+                                {
+                                    <a class="nav-link text-light d-flex align-items-center @(Context.Request.Path.StartsWithSegments("/lp") ? "active" : "")"
+                                       asp-area="User"
+                                       asp-controller="PublicLernpfad"
+                                       asp-action="My"
+                                       style="height:50px; white-space: nowrap;">
+                                        Lernpfad
+                                    </a>
+                                }
+                            </li> -->
+
+
+                            <li class="nav-item mx-2">
+                                <a class="nav-link text-light d-flex align-items-center @IsActive("Home", "Tipps")"
+                                   asp-area="User"
+                                   asp-controller="Home"
+                                   asp-action="Tipps"
+                                   style="height: 50px;">
+                                    Tipps
+                                </a>
+                            </li>
+
+
+                        
+                            <li class="nav-item mx-2">
+                                <a class="nav-link text-light d-flex align-items-center @IsActive("Home", "Kontakt")"
+                                   asp-area="User"
+                                   asp-controller="Home"
+                                   asp-action="Kontakt"
+                                   style="height: 50px;">
+                                    Kontakt
+                                </a>
+                            </li>
+                        </ul>
+
+                    </div>
+                </div>
+            </nav>
+
+        </header>
+
+        <!-- 2.5) Login Partial Row - Only show when logged in -->
+        @if (SignInManager.IsSignedIn(User))
+        {
+            <div class="border-top bg-dark border-bottom py-1 px-4 d-flex justify-content-end">
+                <div class="d-flex gap-3 align-items-center">
+                    <!-- Added flex container -->
+                    <partial name="_LoginPartial" />
+                </div>
+            </div>
+        }
+        <!-- 3) Thick subheader -->
+        <a class="thickSubheader" href="https://medienlabor.uni-wuppertal.de/apps/storyboard/">
+            <div class="headerSubdomains" style="background-color: #f1f1f1;">
+                <div class="container" style="padding: 0;margin-top:0px">
+                    <div class="row position-relative align-items-center">
+                        <div class="col-9 d-flex align-items-center ps-md-4">
+                            <p class="mb-0 fs-4 fw-normal p-3 ">
+                              MediaLab: Story Board
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </a>
+
+
+
+        <!-- 4) Main Content -->
+        @{ var mainContainerClass = (ViewBag.FullWidth as bool? == true) ? "container-fluid" : "container"; }
+        <div class="@mainContainerClass mt-3">
+             <main role="main">
+                 @await Component.InvokeAsync("Breadcrumb") <!-- ✅ HERE -->
+                 <partial name="_Notification" />
+                 @RenderBody()
+             </main>
+         </div>
+    </section>
+
+
+    <!-- Redesigned Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <!-- Quick Links -->
+                <div class="col-md-4 mb-4 mb-md-0 mt-5">
+                    <h5 class="footer-title">Schnellzugriff</h5>
+                    <ul class="footer-links">
+                        <li>
+                            <a asp-area="User" asp-controller="Storyboards" asp-action="Index">
+                                <i class="bi bi-arrow-right me-2"></i>Story Board</a>
+
+                          
+                        </li>
+                      @*   <li>
+                            <a asp-area="User"
+                               asp-controller="Home"
+                               asp-action="Bibliothek"><i class="bi bi-arrow-right me-2"></i>Bibliothek</a>
+                        </li> *@
+                        <li>
+                            <a asp-area="User"
+                               asp-controller="Home"
+                               asp-action="Tipps"><i class="bi bi-arrow-right me-2"></i>Tipps</a>
+                        </li>
+                      
+                        <li>
+                            <a asp-area="User"
+                               asp-controller="Home"
+                               asp-action="Kontakt"><i class="bi bi-arrow-right me-2"></i>Kontakt</a>
+                        </li>
+                    </ul>
+
+                  
+                </div>
+
+                <!-- Contact Information -->
+                <div class="col-md-4 mb-4 mb-md-0 mt-5">
+                   @*  <h5 class="footer-title">Contact</h5>
+                    <ul class="footer-links">
+                        <li><i class="bi bi-envelope me-2"></i> <a href="mailto:info@promptcoach.de">info@promptcoach.de</a></li>
+                        <li><i class="bi bi-geo-alt me-2"></i> University of Wuppertal</li>
+                        <li><i class="bi bi-building me-2"></i> Gaußstraße 20, 42119 Wuppertal</li>
+                        <li><i class="bi bi-telephone me-2"></i> +49 (202) 123-4567</li>
+                    </ul> *@
+
+                   @*  <h5 class="footer-title mt-4">Newsletter</h5>
+                    <p>Subscribe for updates and AI tips</p>
+                    <div class="newsletter-form">
+                        <input type="email" placeholder="Your email address">
+                        <button type="submit"><i class="bi bi-send"></i></button>
+                    </div> *@
+                </div>
+
+                <!-- Logo and Project Info -->
+                <div class="col-md-4 mt-5">
+                    <div class="text-center text-md-end">
+                        <img src="@Url.Content("~/Storyboard_Logo.png")" alt="Story Board Logo" class="footer-logo">
+                        <p>StoryDesign – Didaktisches Denken sichtbar machen. <br /> Ein kreatives, didaktisches Werkzeug für kollaborative Lehr- und Lernmedienentwicklung im Projekt ProviLe.</p>
+
+                       @*  <div class="mt-4">
+                            <img src="/images/logo_XR-ADIQU.png" alt="XR-ADIQU Logo" class="footer-logo">
+                            <p class="small mt-2">A research project by XR-ADIQU at the University of Wuppertal</p>
+                        </div> *@
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-divider"></div>
+
+            <!-- Legal Links -->
+            <div class="legal-links">
+                <a asp-area="User" asp-controller="Home" asp-action="Urheberrecht" style="color:white;font-size:16px; font-size:16px; font-weight: 500; margin: 0 1rem; text-decoration: none;">Urheberrecht</a>
+                <a asp-area="User" asp-controller="Home" asp-action="Impressum" style="color:white;font-size:16px; font-size:16px; font-weight: 500; margin: 0 1rem; text-decoration: none;">Impressum</a>
+                <a href="https://www.uni-wuppertal.de/de/datenschutz/" target="_blank" style="color:white;font-size:16px; font-size:16px; font-weight: 500; margin: 0 1rem; text-decoration: none;">
+                    Datenschutz
+                </a>
+            </div>
+
+            <!-- Copyright -->
+            <div class="footer-bottom text-light">
+                <p> &copy; @DateTime.Now.Year - Storyboard - ZIM: Medialab - ProviLe - Stiftung Innovation in der Hochschullehre.</p>
+                @* <p class="small">Software Development: Firas Alaammar | Concept: Dr. Heike Seehagen-Marx</p> *@
+            </div>
+        </div>
+    </footer>
+
+
+    <!-- ✅ JavaScript Dependencies -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/localization/messages_de.min.js"></script>
+
+
+    <!-- ✅ DataTables, SweetAlert & Toastr -->
+    <script src="//cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+
+    <script>
+        // Global SweetAlert2 helpers
+        window.SB = window.SB || {};
+        (function (SB) {
+            function hasSwal() { return typeof Swal !== 'undefined'; }
+
+            var toastInstance = null;
+
+            SB.toast = function (message, icon) {
+                if (!hasSwal()) { console.log(message); return Promise.resolve(); }
+                if (!toastInstance) {
+                    toastInstance = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 2000,
+                        timerProgressBar: true
+                    });
+                }
+                return toastInstance.fire({
+                    icon: icon || 'info',
+                    title: message
+                });
+            };
+
+            SB.alert = function (message, icon, title) {
+                if (!hasSwal()) { alert(message); return Promise.resolve(); }
+                return Swal.fire({
+                    icon: icon || 'info',
+                    title: title || 'Hinweis',
+                    text: message
+                });
+            };
+
+            SB.confirm = function (message, options) {
+                var opts = options || {};
+                if (!hasSwal()) {
+                    return Promise.resolve(window.confirm(message || opts.text || ''));
+                }
+                return Swal.fire({
+                    title: opts.title || 'Bist du sicher?',
+                    text: message || opts.text || '',
+                    icon: opts.icon || 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: opts.confirmButtonText || 'Ja',
+                    cancelButtonText: opts.cancelButtonText || 'Abbrechen',
+                    reverseButtons: true
+                }).then(function (result) { return result.isConfirmed; });
+            };
+
+            SB.confirmSubmit = function (form, message, options) {
+                if (!form) return true;
+                SB.confirm(message, options).then(function (confirmed) {
+                    if (confirmed) form.submit();
+                });
+                return false;
+            };
+        })(window.SB);
+    </script>
+
+    <!-- ✅ jQuery UI fallback -->
+    <script>
+        document.getElementById("toggleContrast").addEventListener("click", function () {
+            document.body.classList.toggle("contrast-mode");
+            const isActive = document.body.classList.contains("contrast-mode");
+            localStorage.setItem("contrastMode", isActive);
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            if (localStorage.getItem("contrastMode") === "true") {
+                document.body.classList.add("contrast-mode");
+            }
+        });
+
+        if (typeof $.ui === "undefined") {
+            document.write('<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"><\/script>');
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const slider = document.getElementById("fontSlider");
+            const label = document.getElementById("fontValueLabel");
+            const savedSize = localStorage.getItem("fontSizePercentage") || 100;
+
+            document.documentElement.style.fontSize = savedSize + '%';
+            slider.value = savedSize;
+            label.textContent = savedSize + '%';
+
+            slider.addEventListener("input", function () {
+                const size = slider.value;
+                document.documentElement.style.fontSize = size + '%';
+                localStorage.setItem("fontSizePercentage", size);
+                label.textContent = size + '%';
+            });
+        });
+    </script>
+  
+    @functions {
+        public string IsActive(string controller, string action)
+        {
+            var routeData = ViewContext.RouteData;
+            var currentController = routeData.Values["controller"]?.ToString();
+            var currentAction = routeData.Values["action"]?.ToString();
+
+            return (controller == currentController && action == currentAction) ? "active-nav-link" : "";
+        }
+    }
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

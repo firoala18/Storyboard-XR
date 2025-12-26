@@ -1,0 +1,27 @@
+﻿@page "{statusCode:int?}"         
+@model ErrorModel
+@{
+    Layout = "_Layout";           
+    ViewData["Title"] = "Fehler";
+    var code = Model.StatusCode ?? 500;
+}
+
+<section class="container py-5 text-center">
+    <h1 class="display-4 mb-3">Hoppla – ein Fehler ist aufgetreten.</h1>
+
+    <p class="lead">
+        Diese Seite konnte Ihre Anfrage leider nicht verarbeiten.
+        <br />
+        <strong>HTTP @code</strong>
+    </p>
+
+    <p class="text-muted">
+        Versuchen Sie es später noch einmal oder
+        <a href="mailto:support@example.com">kontaktieren Sie uns</a>,
+        falls das Problem dauerhaft besteht.
+    </p>
+
+    <a asp-page="/Index" class="btn btn-primary mt-3">
+        Zur&nbsp;Startseite
+    </a>
+</section>

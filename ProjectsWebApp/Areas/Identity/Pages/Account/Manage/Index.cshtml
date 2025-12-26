@@ -1,0 +1,53 @@
+﻿@page
+@inject UserManager<IdentityUser> UserManager
+@inject SignInManager<IdentityUser> SignInManager
+@inject IHttpContextAccessor HttpContextAccessor
+@model IndexModel
+@{
+    ViewData["Title"] = "Profil";
+    ViewData["ActivePage"] = ManageNavPages.Index;
+}
+
+<style>
+    #profil-aktualisieren-button {
+        /* gradient unchanged */
+        background: #000000;
+        background: -webkit-linear-gradient(to right,#434343,#000000);
+        background: linear-gradient(to right,#434343,#000000);
+        color: #fff;
+    }
+</style>
+
+<h3>@ViewData["Title"]</h3>
+
+
+<partial name="_StatusMessage" for="StatusMessage" />
+
+<div class="row">
+    <div class="col-md-6">
+
+        <form id="profil-formular" method="post" class="p-4 bg-light rounded shadow-sm">
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+            <div class="form-floating mb-4">
+                <input asp-for="Username" class="form-control" placeholder="Benutzername" disabled />
+                <label asp-for="Username" class="form-label">Benutzername (nicht änderbar)</label>
+            </div>
+
+            <div class="form-floating mb-4">
+                <input asp-for="Input.PhoneNumber" class="form-control" placeholder="Telefonnummer eingeben" />
+                <label asp-for="Input.PhoneNumber" class="form-label">Telefonnummer</label>
+                <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
+            </div>
+
+            <button id="profil-aktualisieren-button" type="submit" class="w-100 btn btn-lg" style="background-color:#90bc14; color:white;">
+                Änderungen speichern
+            </button>
+        </form>
+
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

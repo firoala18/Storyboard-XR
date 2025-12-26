@@ -1,0 +1,33 @@
+﻿@page
+@model Disable2faModel
+@{
+    ViewData["Title"] = "2FA deaktivieren";
+    ViewData["ActivePage"] = ManageNavPages.TwoFactorAuthentication;
+}
+
+<partial name="_StatusMessage" for="StatusMessage" />
+
+<h3>@ViewData["Title"]</h3>
+
+<div class="alert alert-warning" role="alert">
+    <strong>Wichtig:</strong> Mit dieser Aktion deaktivieren Sie nur 2FA. Ihre bisher verwendeten Schlüssel bleiben erhalten.
+    Wenn Sie den Schlüssel in Ihrer Authenticator-App ändern möchten, <a asp-page="./ResetAuthenticator" class="text-dark">setzen Sie Ihren Authenticator-Schlüssel zurück</a>.
+</div>
+
+<form method="post" class="w-100 w-md-50 mx-auto">
+    <div class="form-floating mb-3">
+        <input asp-for="Input.Code"
+               class="form-control"
+               autocomplete="off"
+               placeholder="Verifizierungscode" />
+        <label asp-for="Input.Code">Verifizierungscode</label>
+        <span asp-validation-for="Input.Code" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-dark w-100">
+        2FA deaktivieren
+    </button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

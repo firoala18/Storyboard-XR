@@ -1,0 +1,1966 @@
+@using Microsoft.AspNetCore.Identity
+@model ProjectsWebApp.Models.Storyboard
+@inject UserManager<IdentityUser> UserManager
+@{
+    ViewData["Title"] = System.Text.RegularExpressions.Regex.Replace(Model.Title ?? string.Empty, "<.*?>", string.Empty);
+    ViewBag.FullWidth = true;
+
+    var scenes = (Model.Scenes ?? new List<ProjectsWebApp.Models.Scene>())
+                 .OrderBy(s => s.Number).ThenBy(s => s.Id).ToList();
+
+    int qsSceneId = 0;
+    int.TryParse(Context.Request.Query["sceneId"], out qsSceneId);
+    var activeScene = scenes.FirstOrDefault(s => s.Id == qsSceneId) ?? scenes.FirstOrDefault();
+
+    var publicSlug = ViewData["PublicSlug"] as string;
+    var isPublic = !string.IsNullOrWhiteSpace(publicSlug);
+    var readOnly = (ViewData["ReadOnly"] is bool b) ? b : false;
+
+    // Rollen direkt im View prüfen: nur authentifizierte Admin/SuperAdmin dürfen KI-Bilder erzeugen
+    bool canGenerateAi = false;
+    var isAuthenticated = User?.Identity?.IsAuthenticated ?? false;
+    if (isAuthenticated)
+    {
+        var user = await UserManager.GetUserAsync(User);
+        if (user != null)
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            if (roles != null && roles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(r, "SuperAdmin", StringComparison.OrdinalIgnoreCase)))
+            {
+                canGenerateAi = true;
+            }
+        }
+    }
+
+    var basePath = Context.Request.PathBase.HasValue ? Context.Request.PathBase.Value : "";
+
+    string PublicBaseUrl()
+    {
+        var req = Context.Request;
+        var origin = $"{req.Scheme}://{req.Host}";
+        return $"{origin}{basePath}/s/{Model.PublicId}";
+    }
+
+    // ✅ Compute viewerUrl here to avoid Razor mixing errors later
+    var tParam = Context.Request.Query["t"].ToString();
+    var viewerUrl = Url.Action(
+        "Viewer",
+        "Storyboards",
+        new { area = "User", id = Model.Id, t = string.IsNullOrWhiteSpace(tParam) ? null : tParam }
+    );
+}
+
+<style>
+    :root {
+        --green-400: #9fd62a;
+        --green-500: #89ba17;
+        --green-600: #77a514;
+        --green-700: #6a9312;
+        --red-600: #dc2626;
+        --red-700: #b91c1c;
+        --ink: #111827;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --ctl-h: 44px;
+        --gap: 16px;
+        --radius: 12px;
+    }
+
+    .sb-details .container {
+        max-width: 1200px;
+    }
+
+    /* Top bar */
+    .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        margin: 10px 0 18px;
+    }
+
+    .left-actions, .right-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    /* Typography */
+    .page-title h4 {
+        font-size: 1.25rem;
+        line-height: 1.4;
+        margin: 0;
+        font-weight: 800;
+        color: var(--ink);
+        letter-spacing: -.015em;
+    }
+
+    .section-title {
+        font-weight: 600; /* was 800 */
+        color: #1f2937; /* softer than pure black */
+        font-size: 1.05rem; /* a bit smaller */
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+
+    .hint, .text-muted, small {
+        font-size: 14px;
+        color: var(--muted);
+    }
+
+    /* Rich text (rendered CKEditor content) */
+    .richtext { line-height: 1.6; }
+    .richtext p { margin: 0 0 .5rem; }
+    .richtext ul, .richtext ol { margin: .5rem 0; padding-left: 1.25rem; }
+    .richtext li { margin: .25rem 0; }
+    .richtext a { color: var(--green-700); text-decoration: underline; }
+    .richtext blockquote { margin: .6rem 0; padding-left: .75rem; border-left: 3px solid #e5e7eb; color: #374151; }
+
+    /* Buttons */
+    .sb-details .btn {
+        border-radius: 10px;
+        padding: 10px 18px;
+        font-weight: 800;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sb-details .btn-primary {
+        background: var(--green-500);
+        border: 1px solid var(--green-600);
+        color: #fff;
+        transition: .2s;
+    }
+
+        .sb-details .btn-primary:hover {
+            background: var(--green-600);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(137,186,23,.28);
+        }
+
+        .card .caret {
+            width: 1.1em;
+            height: 1em;
+            color: #6b7280;
+            flex: 0 0 1.1em;
+            text-align: center;
+            margin-left: auto;
+        }
+        .card .caret::before { content: "▸"; }
+        .card.open .caret::before { content: "▾"; }
+
+        .card .body { display: none; }
+        .card.open .body { display: block; }
+
+
+    .sb-details .btn-secondary {
+        background: #fff;
+        border: 1px solid rgba(137,186,23,.35);
+        color: var(--green-700);
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-weight: 800;
+        text-decoration: none !important;
+        transition: background .2s ease, color .2s ease, border-color .2s ease;
+    }
+
+        .sb-details .btn-secondary:hover {
+            background: rgba(137,186,23,.08);
+            color: var(--green-700);
+        }
+
+    .sb-details .btn-share {
+        background: var(--green-500);
+        border: 1px solid var(--green-600);
+        color: #fff;
+    }
+
+        .sb-details .btn-share:hover {
+            background: var(--green-600);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(137,186,23,.28);
+        }
+
+    .sb-details .btn-danger {
+        background: var(--red-600);
+        border: 1px solid var(--red-700);
+        color: #fff;
+    }
+
+        .sb-details .btn-danger:hover {
+            background: var(--red-700);
+        }
+
+    .sb-details .btn-outline {
+        background: #fff;
+        border: 1px dashed #cfd6e4;
+        color: #334155;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-weight: 700;
+    }
+
+    /* URL list inputs */
+    .url-list .rows { display: grid; gap: 8px; }
+    .url-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .url-row .rm { background: #fff; border: 1px solid #f2c9ce; color: #d9534f; border-radius: 8px; padding: 6px 10px; font-weight: 700; }
+    .url-row .url-input.invalid { border-color: #ef4444 !important; box-shadow: 0 0 0 .2rem rgba(239,68,68,.2) !important; }
+
+    /* Sections/cards */
+    .form-section {
+        background: #fff;
+        border: 1px solid #e4e4e4;
+        border-radius: 10px;
+        padding: 16px 18px;
+        box-shadow: 0 8px 24px rgba(0,0,0,.06);
+        margin-bottom: 22px;
+        position: relative;
+    }
+
+    /* Accordion */
+    details.acc {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+        details.acc summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            position: relative;
+            user-select: none;
+            transition: background .15s ease, border-color .15s ease;
+        }
+
+        .summary-actions{ display:flex; gap:.5rem; align-items:center; }
+
+    details.acc summary:hover {
+        background: rgba(137,186,23,.06);
+        border-color: rgba(137,186,23,.35);
+    }
+
+    details.acc summary:focus-visible {
+        outline: 3px solid rgba(137,186,23,.35);
+        outline-offset: 2px;
+    }
+
+    /* chevron shown left of the title; match global accordion */
+    .acc-caret {
+        width: 1.6em;
+        height: 1.6em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        line-height: 1;
+        margin-right: .5rem;
+        font-size: 2rem;
+        color: #4b5563;
+    }
+    .acc-caret::before { content: "▸"; }
+    details.acc[open] .acc-caret::before { content: "▾"; }
+
+    /* KI & Prompts accordion polishing */
+    details.acc.ki-prompts summary {
+        border-color: rgba(137,186,23,.35);
+        background: #fbfef7;
+    }
+    details.acc.ki-prompts[open] .acc-body {
+        background: #fcfdfc;
+    }
+    details.acc.ki-prompts .acc-body .full { margin-bottom: 10px; }
+    details.acc.ki-prompts .hint { font-size: 13px; color: var(--muted); }
+
+    /* --- Icon-only button: perfectly centered icon --- */
+    .sb-details .btn i {
+        line-height: 0;
+        display: inline-block;
+    }
+
+    .sb-details .btn-icon {
+        padding: 0 !important;
+        width: 36px;
+        height: 36px;
+        display: inline-grid;
+        place-items: center;
+        border-radius: 10px;
+    }
+
+    .summary-actions .btn-icon {
+        width: 34px;
+        height: 34px;
+    }
+    /* smaller in summary */
+
+        /* make the summary button slightly smaller */
+        .sb-details .summary-actions .btn {
+            padding: 8px 12px;
+            font-weight: 700;
+            border-radius: 10px;
+        }
+
+    /* Divider between marker card actions */
+    .form-actions .divider {
+        width: 1px;
+        height: 28px;
+        background: var(--line);
+        align-self: center;
+    }
+
+    /* Hide marker coordinate readout */
+    .coords { display:none !important; }
+
+    /* Slightly more spacing between inputs inside marker grid */
+    .grid .cell, .grid .full { margin-bottom: 8px; }
+
+        details.acc[open] summary {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        details.acc .acc-body {
+            border: 1px solid var(--line);
+            border-top: 0;
+            padding: 16px;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+    /* Meta grid */
+    .meta-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .meta-item label {
+        font-size: 1.05rem; /* slightly larger for better readability */
+        font-weight: 600; /* was 700/800 */
+        color: #374151;
+        margin-bottom: 4px;
+    }
+
+    .meta-item div {
+        color: #111827;
+        font-size: 1rem;
+    }
+
+    /* Meta item dividers */
+    .meta-grid .meta-item {
+        padding: 10px 0;
+        border-top: 1px solid #eef1f6;
+    }
+
+        .meta-grid .meta-item:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+
+    /* Taxonomie chips */
+    .taxo-chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+    }
+
+        .taxo-chips .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: .9rem;
+            background: rgba(137,186,23,.12);
+            color: var(--green-700);
+            border: 1px solid rgba(137,186,23,.25);
+        }
+
+            .taxo-chips .chip.active {
+                background: var(--green-500);
+                color: #fff;
+                border-color: var(--green-500);
+            }
+
+    .palette {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+    }
+
+    .swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid rgba(0,0,0,.15);
+    }
+
+    .swatch-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        min-width: 52px;
+    }
+
+    .swatch-hex {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: .8rem;
+        color: #374151;
+        line-height: 1;
+        letter-spacing: .02em;
+    }
+
+    /* Tabs (scenes) */
+    .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 6px 0 10px;
+    }
+
+    .tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid #d8dbe3;
+        background: #f7f8fb;
+        color: #2e3340;
+        text-decoration: none;
+        font-weight: 800;
+        transition: .15s;
+    }
+
+        .tab:hover {
+            background: rgba(137,186,23,.10);
+            border-color: rgba(137,186,23,.35);
+            color: var(--green-700);
+        }
+
+        .tab.active {
+            background: var(--green-500);
+            color: #fff;
+            border-color: var(--green-500);
+        }
+
+        .tab.add {
+            background: #000;
+            color: #fff;
+            border-color: #000;
+        }
+
+            .tab.add:hover {
+                background: #111;
+                border-color: #111;
+            }
+
+    /* Board */
+    .board {
+        position: relative;
+        display: block;
+        background: #fff;
+        border: 1px solid #e4e4e4;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 6px 18px rgba(0,0,0,.06);
+        max-width: 100%;
+    }
+
+        .board img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+    .overlay {
+        position: absolute;
+        inset: 0;
+    }
+
+    /* Marker pin */
+    .dot-wrap {
+        position: absolute;
+        transform: translate(-50%,-50%);
+        z-index: 2;
+    }
+
+    .num-badge {
+        --c: var(--green-500);
+        display: inline-block;
+        width: 26px;
+        height: 26px;
+        font: 700 13px/26px system-ui,Segoe UI,Roboto;
+        text-align: center;
+        color: #fff;
+        background: var(--c);
+        border-radius: 50%;
+        border: 2px solid #fff;
+        outline: 1px solid rgba(0,0,0,.2);
+        user-select: none;
+        touch-action: none;
+        cursor: pointer;
+        position: relative;
+        transition: box-shadow .15s, transform .05s;
+    }
+
+        .num-badge.selected {
+            box-shadow: 0 0 0 6px rgba(137,186,23,.25);
+        }
+
+        .num-badge.dirty {
+            box-shadow: 0 0 0 6px rgba(255,213,79,.35);
+        }
+
+            .num-badge.dirty::after {
+                content: '!';
+                position: absolute;
+                top: -5px;
+                right: -5px;
+                width: 16px;
+                height: 16px;
+                border-radius: 999px;
+                background: #fff3cd;
+                color: #664d03;
+                border: 1px solid #ffe69c;
+                font: 900 11px/16px system-ui,Segoe UI,Roboto;
+                text-align: center;
+                box-shadow: 0 1px 2px rgba(0,0,0,.08);
+            }
+
+        .num-badge:active {
+            transform: scale(.96);
+        }
+
+    /* Marker cards */
+    .cards {
+        margin-top: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .card {
+        background: #fff;
+        border: 1px solid #e4e4e4;
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 4px 14px rgba(0,0,0,.05);
+        transition: border-color .15s, box-shadow .15s;
+    }
+
+        .card.open {
+            border-color: var(--green-500);
+            box-shadow: 0 10px 24px rgba(0,0,0,.1);
+        }
+
+        .card .head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .card .badge {
+            --c: var(--green-500);
+            color: #fff;
+            background: var(--c);
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-weight: 800;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        .card .title {
+            color: #222;
+            font-weight: 700;
+        }
+
+    .grid {
+        display: grid;
+        grid-template-columns: 120px 140px minmax(260px, 1fr);
+        gap: var(--gap);
+        align-items: start;
+    }
+
+        .grid > .cell {
+            min-width: 0;
+        }
+
+        .grid .full {
+            grid-column: 1/-1;
+        }
+
+    label {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 4px;
+        display: block;
+        font-weight: 700;
+    }
+
+    input[type=text], textarea, input[type=number], input[type=color], select {
+        width: 100%;
+        background: #fff;
+        color: #222;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        padding: 10px 12px;
+        min-height: var(--ctl-h);
+        outline: none;
+        transition: .15s ease;
+    }
+
+    input[type=color] {
+        padding: 0;
+        height: var(--ctl-h);
+        cursor: pointer;
+    }
+
+    select[data-field="taxonomie"] {
+        font-weight: 800;
+        background: rgba(137,186,23,.10);
+        border-color: rgba(137,186,23,.35);
+        color: var(--green-700);
+        border-radius: 10px;
+    }
+
+    input[type=text]:focus, textarea:focus, input[type=number]:focus, select:focus {
+        border-color: var(--green-500);
+        box-shadow: 0 0 0 .2rem rgba(137,186,23,.20);
+    }
+
+    textarea {
+        min-height: 72px;
+        resize: vertical;
+    }
+
+    .sb-details .ck.ck-editor { width: 100%; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+    .sb-details .ck.ck-editor.ck-focused { border-color: var(--green-500); box-shadow: 0 0 0 .2rem rgba(137,186,23,.20); }
+    .sb-details .ck.ck-editor .ck-toolbar { border: 0; background: #f8fafc; border-bottom: 1px solid var(--line); border-radius: 10px 10px 0 0; }
+    .sb-details .ck.ck-editor .ck-toolbar .ck-button { border-radius: 8px; }
+    .sb-details .ck.ck-editor .ck-content { border: 0; background: #fff; padding: 12px; border-radius: 0 0 10px 10px; }
+    textarea[data-field="ziel"] + .ck-editor .ck-content { min-height: 120px; }
+    textarea[data-field="description"] + .ck-editor .ck-content { min-height: 150px; }
+    textarea[data-field="quellen"] + .ck-editor .ck-content { min-height: 150px; }
+    textarea[data-field="promptIdee"] + .ck-editor .ck-content { min-height: 200px; }
+    textarea[data-field="reflexion"] + .ck-editor .ck-content { min-height: 200px; }
+
+    .sb-details .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+
+    .coords {
+        font-size: 14px;
+        color: #666;
+        margin-right: auto;
+    }
+
+    .unsaved {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        font-weight: 800;
+        font-size: 14px;
+        color: #664d03;
+        background: #fff3cd;
+        border: 1px solid #ffe69c;
+        border-radius: 999px;
+        padding: 4px 8px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 4px;
+        align-items: center;
+    }
+
+    /* Tab close 'x' */
+    .tab-wrap {
+        position: relative;
+    }
+
+    .tab-del-form {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        margin: 0;
+    }
+
+    .tab-del {
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: #fff;
+        border: 1px solid #fecaca;
+        color: #b42318;
+        font-weight: 800;
+        line-height: 1;
+        box-shadow: 0 2px 6px rgba(0,0,0,.08);
+        cursor: pointer;
+        opacity: 0;
+        transform: scale(.9);
+        transition: opacity .15s, transform .15s, background .15s;
+    }
+
+        .tab-wrap:hover .tab-del, .tab-del:focus {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .tab-del:hover {
+            background: #fff5f5;
+        }
+
+    /* Section head with actions (right-aligned) */
+    .section-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .section-actions { display:flex; align-items:center; gap:8px; }
+
+    /* AI image generation popover */
+    .aiimg-popover {
+        position: absolute;
+        top: 56px;
+        right: 18px;
+        z-index: 1100;
+        width: min(420px, 100% - 32px);
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid var(--line);
+        box-shadow: 0 18px 40px rgba(15,23,42,.22);
+        transform-origin: top right;
+        transform: scale(.95) translateY(-4px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease, transform .15s ease;
+    }
+
+        .aiimg-popover.open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1) translateY(0);
+        }
+
+    .aiimg-title { font-weight: 700; margin-bottom: 4px; }
+    .aiimg-note { font-size: .9rem; color: var(--muted); margin-bottom: 8px; }
+    .aiimg-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+    .aiimg-status { font-size:.85rem; color:var(--muted); margin-top:4px; display:flex; align-items:center; gap:6px; }
+    .aiimg-status img { height:18px; }
+
+    /* Share modal */
+    .sb-share-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .sb-share-modal {
+        background: #fff;
+        border-radius: 14px;
+        padding: 20px 22px 18px;
+        border: 1px solid var(--line);
+        box-shadow: 0 20px 40px rgba(0,0,0,.18);
+        max-width: 620px;
+        width: min(96%, 620px);
+        position: relative;
+    }
+
+        .sb-share-modal h4 {
+            margin: 0;
+            font-weight: 800;
+            color: var(--ink);
+            font-size: 1.3rem;
+        }
+
+        .sb-share-modal .share-intro {
+            margin-top: 4px;
+            font-size: .9rem;
+            color: var(--muted);
+        }
+
+        .sb-share-modal .row {
+            margin-top: 14px;
+        }
+
+        .sb-share-modal .row.field {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sb-share-modal #shareLink {
+            flex: 1 1 260px;
+            min-width: 0;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: #f9fafb;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: .9rem;
+        }
+
+        .sb-share-modal .row.field .btn-copy,
+        .sb-share-modal .row.field .btn-close {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
+        .sb-share-modal .sb-share-close {
+            position: absolute;
+            top: 12px;
+            right: 14px;
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            border: 1px solid rgba(148,163,184,.6);
+            background: #f9fafb;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            padding: 0;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(15,23,42,.15);
+        }
+
+        .sb-share-modal .sb-share-close:hover {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .sb-share-modal .sb-share-close span {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+    .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 800;
+        color: #4b5563;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+        .switch input {
+            transform: scale(1.1);
+            accent-color: var(--green-500);
+        }
+
+    .sb-details .btn-copy {
+        background: #000;
+        color: #fff;
+        border: 1px solid #000;
+    }
+
+    .sb-details .btn-close {
+        background: #f3f4f6;
+        border: 1px solid var(--line);
+    }
+
+    /* Responsive */
+    @@media (max-width:992px) {
+        .grid {
+            grid-template-columns: minmax(120px, 180px) 1fr;
+        }
+    }
+
+    @@media (max-width:640px) {
+        .topbar {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .left-actions a, .left-actions button, .right-actions a {
+            width: 100%;
+        }
+
+        .grid {
+            grid-template-columns: 1fr;
+        }
+
+        .coords {
+            order: 3;
+            width: 100%;
+            margin-top: 4px;
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        * {
+            transition: none !important;
+        }
+    }
+</style>
+
+<div class="container-fluid px-0 mt-4 sb-details">
+    <div class="topbar">
+        @{
+          
+            var backHref = (!string.IsNullOrWhiteSpace(publicSlug) || !isAuthenticated)
+            ? (basePath + "/s/my")
+            : Url.Action("Index", "Storyboards", new { area = "User" });
+        }
+
+        <!-- LEFT: Zur Übersicht (always to Index) -->
+        <div class="left-actions">
+            <a class="btn btn-secondary" href="@backHref" title="Zur Übersicht">
+                Zur Übersicht
+            </a>
+        </div>
+
+        <!-- RIGHT: actions in a three-dots (kebab) dropdown -->
+        <div class="right-actions">
+            <div class="dropdown">
+                <button class="btn btn-secondary" type="button" id="topbarActionsToggle" data-bs-toggle="dropdown" aria-expanded="false" title="Aktionen">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="topbarActionsToggle">
+                    @if (isPublic)
+                    {
+                        <li>
+                            <a href="@(basePath + "/s/" + Model.PublicId)" class="dropdown-item">
+                                <i class="bi bi-eye me-2"></i>Viewer
+                            </a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li>
+                            <a href="@viewerUrl" class="dropdown-item">
+                                <i class="bi bi-eye me-2"></i>Viewer
+                            </a>
+                        </li>
+                    }
+                    <li><hr class="dropdown-divider" /></li>
+                    <li>
+                        <button type="button" id="shareBtn" class="dropdown-item" title="Teilen">
+                            <i class="fa fa-share-alt me-2" aria-hidden="true"></i>Teilen
+                        </button>
+                    </li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li>
+                        <a asp-area="User"
+                           asp-controller="Storyboards"
+                           asp-action="PromptList"
+                           asp-route-id="@Model.Id"
+                           asp-route-t="@(ViewBag.Token as string)"
+                           class="dropdown-item" title="Prompt-Liste">
+                            <i class="bi bi-list-stars me-2"></i>Prompt-Liste
+                        </a>
+                    </li>
+                    <li>
+                        <a asp-area="User"
+                           asp-controller="Storyboards"
+                           asp-action="ReflexionList"
+                           asp-route-id="@Model.Id"
+                           asp-route-t="@(ViewBag.Token as string)"
+                           class="dropdown-item" title="Reflexion-Liste">
+                            <i class="bi bi-journal-text me-2"></i>Reflexion-Liste
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Allgemeine Informationen (accordion) -->
+    <details class="acc mb-5" open>
+        <summary>
+            <span class="section-title">
+                <span class="acc-caret" aria-hidden="true">
+                    <!-- chevron -->
+                   
+                </span>
+                <i class="fas fa-info-circle"></i> Allgemeine Informationen
+            </span>
+
+            <span class="summary-actions">
+                @* Edit button inside the summary, icon-only and centered *@
+                @if (isPublic)
+                {
+                    <a href="@(basePath + "/s/" + Model.PublicId + "/edit")"
+                       class="btn btn-primary btn-icon" title="Storyboard bearbeiten" aria-label="Bearbeiten">
+                        <i class="fa-regular fa-pen-to-square"></i>
+                    </a>
+                }
+                else
+                {
+                    <a asp-area="User" asp-controller="Storyboards" asp-action="Edit"
+                       asp-route-id="@Model.Id"
+                       asp-route-t="@(ViewBag.Token as string)"
+                       class="btn btn-primary btn-icon" title="Storyboard bearbeiten" aria-label="Bearbeiten">
+                        <i class="fa-regular fa-pen-to-square"></i>
+                    </a>
+                }
+            </span>
+        </summary>
+
+
+        <div class="acc-body">
+            <div class="meta-grid meta-grid--stack">
+                @* Cover image for the whole Storyboard *@
+                @if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+                {
+                    var coverUrl = basePath + Model.ImagePath;
+                    <div class="meta-item" style="grid-column:1/-1">
+                        <label>Cover-Bild</label>
+                        <div style="margin-top:6px; max-width:420px; border-radius:12px; overflow:hidden; border:1px solid #e5e7eb; box-shadow:0 6px 18px rgba(16,24,40,.06);">
+                            <img src="@coverUrl" alt="Cover-Bild von @Model.Title" style="display:block; width:100%; height:auto; object-fit:cover;" />
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.Title))
+                {
+                    <div class="meta-item" style="grid-column:1/-1">
+                        <label>Titel</label>
+                        <div class="richtext">@Html.Raw(Model.Title)</div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.Zielgruppe))
+                {
+                    <div class="meta-item">
+                        <label>Zielgruppe</label>
+                        <div class="richtext">@Html.Raw(Model.Zielgruppe)</div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.Lernziel))
+                {
+                    <div class="meta-item">
+                        <label>Lernziel</label>
+                        <div class="richtext">@Html.Raw(Model.Lernziel)</div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.Beschreibung))
+                {
+                    <div class="meta-item" style="grid-column:1/-1">
+                        <label>Beschreibung</label>
+                        <div class="richtext">@Html.Raw(Model.Beschreibung)</div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.Farbpalette))
+                {
+                    var colors = Model.Farbpalette.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    var hexes = colors.Select(c => c.StartsWith("#") ? c : ("#" + c)).ToArray();
+                    <div class="meta-item" style="grid-column:1/-1">
+                        <label>Farbpalette</label>
+                        <div class="palette">
+                            @foreach (var cc in hexes)
+                            {
+                                <div class="swatch-wrap" title="@cc">
+                                    <div class="swatch" style="background-color:@cc"></div>
+                                    <div class="swatch-hex">@cc</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (Model.Taxonomie.HasValue)
+                {
+                    var levels = Enumerable.Range(0, (int)Model.Taxonomie.Value + 1).ToArray();
+                    <div class="meta-item" style="grid-column:1/-1">
+                        <label>Taxonomie</label>
+                        <div class="taxo-chips">
+                            @for (var i = 0; i < levels.Length; i++)
+                            {
+                                var name = ((ProjectsWebApp.Models.TaxonomieStufe)levels[i]).ToString();
+                                var isLast = i == levels.Length - 1;
+                                <span class="chip @(isLast ? "active" : "")">@name</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </details>
+
+    <!-- Szenen -->
+    <div class="form-section">
+        <div class="section-head">
+            <h3 class="section-title"><i class="fas fa-film"></i>Szenen</h3>
+            @if (canGenerateAi)
+            {
+                <div class="section-actions">
+
+                    <button type="button" class="btn btn-secondary btn-icon" id="aiImgBtn" title="KI-Bild aus Prompt erzeugen" aria-label="KI-Bild erzeugen">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </button>
+
+                    @if (activeScene != null)
+                    {
+                        <a asp-area="User" asp-controller="Scenes" asp-action="Edit" asp-route-id="@activeScene.Id"
+                           class="btn btn-primary btn-icon" title="Szene bearbeiten" aria-label="Szene bearbeiten">
+                            <i class="fa-regular fa-pen-to-square"></i>
+                        </a>
+                    }
+                   
+                </div>
+            }
+            else
+            {
+                @if (activeScene != null)
+                {
+                    <a asp-area="User" asp-controller="Scenes" asp-action="Edit" asp-route-id="@activeScene.Id"
+                       class="btn btn-primary btn-icon" title="Szene bearbeiten" aria-label="Szene bearbeiten">
+                        <i class="fa-regular fa-pen-to-square"></i>
+                    </a>
+                }
+            }
+        </div>
+
+        @if (canGenerateAi)
+        {
+            @Html.AntiForgeryToken()
+            <div id="aiImgPopover" class="aiimg-popover" aria-hidden="true">
+                <div class="aiimg-title">
+                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> KI-Bild erzeugen
+                </div>
+                <div class="aiimg-note">
+                    Beschreibe das gewünschte Bild in einem Satz. Es wird als neue Szene zu diesem Storyboard hinzugefügt.
+                </div>
+                <textarea id="aiImgPrompt" rows="3" placeholder="z.B. Illustratives Klassenraum-Bild zur Einführung in Photosynthese …"></textarea>
+
+                <div class="mt-2">
+                    <label for="aiImgStyle" class="form-label mb-1">Stil</label>
+                    <select id="aiImgStyle" class="form-select form-select-sm">
+                        <option value="">Standard</option>
+                        <option value="realistic">Realistisch</option>
+                        <option value="cartoon">Cartoon / Comic</option>
+                        <option value="illustration">Illustration</option>
+                        <option value="sketch">Skizze / Lineart</option>
+                    </select>
+                </div>
+
+                <div class="mt-2">
+                    <label for="aiImgAspect" class="form-label mb-1">Seitenverhältnis</label>
+                    <select id="aiImgAspect" class="form-select form-select-sm">
+                        <option value="1:1">1 : 1 (Quadrat)</option>
+                        <option value="16:9">16 : 9 (Querformat)</option>
+                        <option value="9:16">9 : 16 (Hochformat)</option>
+                        <option value="4:3">4 : 3 (Querformat)</option>
+                        <option value="3:4">3 : 4 (Hochformat)</option>
+                    </select>
+                </div>
+
+                <div class="mt-2">
+                    <label for="aiImgQuality" class="form-label mb-1">Qualität</label>
+                    <select id="aiImgQuality" class="form-select form-select-sm">
+                        <option value="low">Günstig (low)</option>
+                        <option value="medium">Standard (medium)</option>
+                        <option value="high">Hoch (high)</option>
+                    </select>
+                </div>
+
+                <div class="aiimg-status" id="aiImgStatus">
+                    <span id="aiImgStatusText"></span>
+                    <img id="aiImgSpinner" src="@(basePath)/images/image_generating_loading.gif" alt="Bild wird generiert" style="display:none;" />
+                </div>
+                <div class="aiimg-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" id="aiImgCancel">Abbrechen</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="aiImgSubmit">Bild generieren</button>
+                </div>
+            </div>
+        }
+        @if (scenes.Any())
+        {
+            <div id="sceneTabs" class="tabs">
+                @foreach (var sc in scenes)
+                {
+                    var isActive = activeScene != null && sc.Id == activeScene.Id;
+                    <div class="tab-wrap">
+                        <a class="tab @(isActive ? "active" : "")"
+                           href="@(isPublic
+                                                               ? Url.Action("OpenBySlug", "PublicStoryboards", new { area = "User", slug = Model.PublicId, sceneId = sc.Id })
+                                                       : Url.Action("Details", "Storyboards", new { area = "User", id = Model.Id, sceneId = sc.Id }))">
+                            @(string.IsNullOrWhiteSpace(sc.Name) ? $"{sc.Number}. Szene" : $"{sc.Number}. {sc.Name}")
+                        </a>
+                        @if (!readOnly)
+                        {
+                            <form asp-area="User" asp-controller="Scenes" asp-action="Delete" method="post" class="tab-del-form"
+                                  onsubmit="return confirm('Diese Szene wirklich löschen?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@sc.Id" />
+                                <input type="hidden" name="storyboardId" value="@Model.Id" />
+                                <button type="submit" class="tab-del" title="Szene löschen" aria-label="Szene löschen">×</button>
+                            </form>
+                        }
+                    </div>
+                }
+                @if (!readOnly)
+                {
+                    <a class="tab add" asp-area="User" asp-controller="Scenes" asp-action="Create" asp-route-storyboardId="@Model.Id" asp-route-slug="@Model.PublicId">
+                        <i class="bi bi-plus-lg"></i> Szene
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <div id="sceneTabs" class="tabs">
+                @if (!readOnly)
+                {
+                    <a class="tab add" asp-area="User" asp-controller="Scenes" asp-action="Create" asp-route-storyboardId="@Model.Id" asp-route-slug="@Model.PublicId">
+                        + Erste Szene hinzufügen
+                    </a>
+                }
+            </div>
+        }
+
+        @if (activeScene != null)
+        {
+            <div id="board" class="board mt-2" data-scene-id="@activeScene.Id">
+                <img id="scene" src="@(basePath + activeScene.ImagePath)" alt="@Model.Title" />
+                <div id="overlay" class="overlay" aria-hidden="true"></div>
+            </div>
+
+            <div class="text-muted mt-2" style="font-size:14px">
+                Tipp: Bild anklicken, um Marker hinzuzufügen. Marker <strong>über die Nummer</strong> ziehen zum Verschieben.
+                Änderungen pro Marker mit <strong>speichern</strong> speichern.
+            </div>
+
+            <div id="cards" class="cards"></div>
+        }
+        else
+        {
+            <div class="alert alert-info mt-3">Noch keine Szenen vorhanden. Lege die erste Szene an.</div>
+        }
+    </div>
+</div>
+
+<!-- Share modal -->
+<div id="shareBackdrop" class="sb-share-backdrop" aria-hidden="true">
+    <div class="sb-share-modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+        <button type="button" class="sb-share-close" id="closeShare" aria-label="Schließen">
+            <span aria-hidden="true">&times;</span>
+        </button>
+        <h4 id="shareTitle">Storyboard teilen</h4>
+        <p class="share-intro">Teile einen sicheren Link zum Viewer. Optional kannst du einen Edit-Link für Bearbeitung aktivieren.</p>
+        <div class="row">
+            <label class="switch">
+                <input type="checkbox" id="shareAllowEdit" />
+                Bearbeiten / Löschen erlauben (Edit-Link)
+            </label>
+        </div>
+        <div class="row field">
+            <input type="text" id="shareLink" readonly />
+            <button type="button" class="btn btn-copy" id="copyLink">Copy</button>
+        </div>
+        <div id="shareHint" class="hint"></div>
+    </div>
+</div>
+
+@* Prompt-Liste now has its own dedicated view (Storyboards/PromptList). *@
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@7.0.5/dist/browser/signalr.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
+    <script>
+        (() => {
+          const accDetails = document.querySelectorAll('details.acc');
+          accDetails.forEach(d => {
+            const body = d.querySelector('.acc-body');
+            if (!body) return;
+            body.style.overflow = 'hidden';
+            body.style.transition = 'height .28s ease, opacity .2s ease';
+            if (d.open) {
+              body.style.height = 'auto';
+              body.style.opacity = '1';
+            } else {
+              body.style.height = '0px';
+              body.style.opacity = '0';
+            }
+            d.addEventListener('toggle', () => {
+              if (d.open) {
+                body.style.height = body.scrollHeight + 'px';
+                body.style.opacity = '1';
+              } else {
+                body.style.height = body.scrollHeight + 'px';
+                requestAnimationFrame(() => {
+                  body.style.height = '0px';
+                  body.style.opacity = '0';
+                });
+              }
+            });
+            body.addEventListener('transitionend', (e) => {
+              if (e.propertyName !== 'height') return;
+              if (d.open) body.style.height = 'auto';
+            });
+          });
+          /* -------- Share -------- */
+          const publicSlug = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.PublicId));
+          const isPublic = @Html.Raw((string.IsNullOrWhiteSpace(ViewData["PublicSlug"] as string) ? "false" : "true"));
+          const shareBtn = document.getElementById('shareBtn');
+          const shareBackdrop = document.getElementById('shareBackdrop');
+          const shareAllowEdit = document.getElementById('shareAllowEdit');
+          const shareLink = document.getElementById('shareLink');
+          const shareHint = document.getElementById('shareHint');
+          const copyBtn = document.getElementById('copyLink');
+          const closeBtn = document.getElementById('closeShare');
+          const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+          const PATH_BASE = '@basePath';
+          const baseLink = `${origin}${PATH_BASE}/s/${publicSlug}`;
+          const urlK = new URLSearchParams(location.search).get('k');
+          if (urlK) try { localStorage.setItem(`sb_k_${publicSlug}`, urlK); } catch {}
+          let editKey = urlK || (localStorage.getItem(`sb_k_${publicSlug}`) || '');
+          async function ensureEditKey() {
+            if (editKey) return editKey;
+            try {
+              shareHint.textContent = 'Generiere Edit-Key…';
+              const res = await fetch(`${PATH_BASE}/s/${publicSlug}/edit-key`, { method:'POST', headers:{'Content-Type':'application/json'}});
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              const data = await res.json(); editKey = data.key || '';
+              if (editKey) try { localStorage.setItem(`sb_k_${publicSlug}`, editKey); } catch {}
+            } catch(e){ console.warn('Edit-key generate failed:', e); editKey=''; }
+            return editKey;
+          }
+          async function updateShareUrl(){
+            if (shareAllowEdit.checked) {
+              if (!editKey) await ensureEditKey();
+              if (editKey) { shareLink.value = `${baseLink}?k=${editKey}`; shareHint.textContent = 'Jeder, der diesen Link erhält, kann in diesem Browser Bearbeitung aktivieren.'; }
+              else { shareLink.value = baseLink; shareHint.textContent = 'Konnte Edit-Key nicht erzeugen (keine Berechtigung?).'; }
+            } else { shareLink.value = baseLink; shareHint.textContent = 'Nur Lesezugriff. Sicher zum Weitergeben.'; }
+          }
+          shareAllowEdit?.addEventListener('change', updateShareUrl);
+          shareBtn?.addEventListener('click', () => { shareBackdrop.style.display='flex'; updateShareUrl(); shareLink.select(); });
+          closeBtn?.addEventListener('click', () => { shareBackdrop.style.display='none'; });
+          shareBackdrop?.addEventListener('click', (e) => { if (e.target === shareBackdrop) shareBackdrop.style.display='none'; });
+          document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (shareBackdrop) shareBackdrop.style.display='none'; } });
+          copyBtn?.addEventListener('click', async () => {
+            try { await navigator.clipboard.writeText(shareLink.value); copyBtn.textContent='Kopiert!'; setTimeout(()=>copyBtn.textContent='Copy',1200); }
+            catch { shareLink.select(); document.execCommand('copy'); }
+          });
+
+          /* -------- Markers -------- */
+          const PATH_BASE_JS = PATH_BASE;
+          const API_BASE = `${PATH_BASE_JS}/api/scenes`;
+          const SB_ID    = @Model.Id;
+          const TAXO_NAMES = ['Erinnern','Verstehen','Anwenden','Analysieren','Bewerten','Erschaffen'];
+          const MAX_TAXO = @Html.Raw((Model.Taxonomie.HasValue ? ((int)Model.Taxonomie.Value).ToString() : "-1"));
+          const State = { markers:[], sceneId:null, els:{}, openId:null, creatingMarker:false, editors:{} };
+
+          const api = {
+            list: sceneId => fetch(`${API_BASE}/${sceneId}/markers`).then(r => r.ok ? r.json() : []),
+            create: (sceneId, x, y, colorHex) => fetch(`${API_BASE}/${sceneId}/markers`, {
+              method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({x,y,colorHex})
+            }).then(r => r.json()),
+            update: (sceneId, id, p) => fetch(`${API_BASE}/${sceneId}/markers/${id}`, {
+              method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)
+            }).then(async r => { if(!r.ok) throw new Error(await r.text()); return r.json().catch(()=>null); }),
+            remove: (sceneId, id) => fetch(`${API_BASE}/${sceneId}/markers/${id}`, { method:'DELETE' })
+          };
+
+          const N = m => ({
+            id: m.id ?? m.Id, x: m.x ?? m.X, y: m.y ?? m.Y,
+            number: m.number ?? m.Number ?? 0,
+            colorHex: m.colorHex ?? m.ColorHex ?? '#89ba17',
+            description: m.description ?? m.Description ?? '',
+            ziel: m.ziel ?? m.Ziel ?? '',
+            datenablage: m.datenablage ?? m.Datenablage ?? '',
+            quellen: m.quellen ?? m.Quellen ?? '',
+            promptIdee: m.promptIdee ?? m.PromptIdee ?? '',
+            reflexion: m.reflexion ?? m.Reflexion ?? '',
+            model: m.model ?? m.Model ?? '',
+            sceneId: m.sceneId ?? m.SceneId,
+            taxonomie: m.taxonomie ?? m.Taxonomie ?? null
+          });
+
+          const el=(t,c)=>{ const e=document.createElement(t); if(c) e.className=c; return e; };
+          const px=n=>`${n}px`;
+          const round2=n=>Math.round(n*100)/100;
+
+          function setDirty(m, chip, card, dirty){
+            m._dirty = dirty;
+            chip?.classList.toggle('dirty', !!dirty);
+            const unsaved = card?.querySelector('.unsaved'); if (unsaved) { unsaved.style.display = dirty ? 'inline-flex' : 'none'; unsaved.title = dirty ? 'Änderungen nicht gespeichert' : ''; }
+            const saveBtn = card?.querySelector('.btn-save'); if (saveBtn) saveBtn.disabled = !dirty;
+            if (chip) chip.title = dirty ? 'Änderungen nicht gespeichert' : '';
+          }
+
+          function renderOverlay(){
+            const { img, overlay } = State.els;
+            overlay.innerHTML='';
+            const iw=img.clientWidth, ih=img.clientHeight; if(!iw||!ih) return;
+
+            State.markers.forEach(m=>{
+              const wrap = el('div','dot-wrap'); wrap.style.left = px(m.x * iw); wrap.style.top = px(m.y * ih); wrap.dataset.id = String(m.id);
+              const badge = el('span','num-badge'); badge.textContent = m.number; badge.style.setProperty('--c', m.colorHex);
+              if (m._dirty) { badge.classList.add('dirty'); badge.title='Änderungen nicht gespeichert'; }
+              wrap.appendChild(badge); overlay.appendChild(wrap);
+              m._badge = badge; m._wrap = wrap;
+              wrap.addEventListener('click', e=>{ e.stopPropagation(); openMarkerCard(m.id); });
+
+              let dragging=false, start={x:0,y:0}, moved=false;
+              badge.addEventListener('pointerdown', e=>{ dragging=true; moved=false; e.stopPropagation(); badge.setPointerCapture(e.pointerId); start.x=e.clientX; start.y=e.clientY; badge.classList.add('selected'); });
+              badge.addEventListener('pointermove', e=>{
+                if(!dragging) return; moved = true;
+                const dx=e.clientX-start.x, dy=e.clientY-start.y; start.x=e.clientX; start.y=e.clientY;
+                const left=(parseFloat(wrap.style.left)||0)+dx, top=(parseFloat(wrap.style.top)||0)+dy;
+                wrap.style.left=px(left); wrap.style.top=px(top);
+                const nx=Math.min(1,Math.max(0,left/iw)), ny=Math.min(1,Math.max(0,top/ih));
+                if (nx!==m.x || ny!==m.y){
+                  m.x=nx; m.y=ny;
+                  const card=document.getElementById(`card-${m.id}`);
+                  // if(card) card.querySelector('.coords').textContent=`x: ${round2(m.x*100)}% • y: ${round2(m.y*100)}%`;
+                  setDirty(m, badge, card, true);
+                }
+              });
+              badge.addEventListener('pointerup', e=>{ if(!dragging) return; dragging=false; try{ badge.releasePointerCapture(e.pointerId); }catch{}; badge.classList.remove('selected'); });
+              badge.addEventListener('click', e=>{ if (moved) { e.stopPropagation(); moved=false; } });
+            });
+          }
+
+          function taxoOptionsHtml(selected){
+            if (MAX_TAXO < 0) return '';
+            let out = '';
+            for (let i=0;i<=MAX_TAXO;i++){
+              const sel = (selected === i) ? ' selected' : '';
+              out += `<option value="${i}"${sel}>${TAXO_NAMES[i] || i}</option>`;
+            }
+            return out;
+          }
+
+          // Build Taxonomie chips HTML (0..selected are shown as active)
+          function buildTaxoChips(selected){
+            if (MAX_TAXO < 0) return '';
+            let out = '';
+            for (let i=0;i<=MAX_TAXO;i++){
+              const active = (typeof selected === 'number' && i <= selected) ? ' active' : '';
+              out += `<button type="button" class="chip${active}" data-val="${i}">${TAXO_NAMES[i] || i}</button>`;
+            }
+            return out;
+          }
+
+          // --- KI Bildgenerierung (Neue Szene) ---
+          (function(){
+            const btn = document.getElementById('aiImgBtn');
+            const pop = document.getElementById('aiImgPopover');
+            if (!btn || !pop) return;
+            const promptEl = document.getElementById('aiImgPrompt');
+            const statusEl = document.getElementById('aiImgStatus');
+            const statusTextEl = document.getElementById('aiImgStatusText');
+            const spinnerEl = document.getElementById('aiImgSpinner');
+            const cancelBtn = document.getElementById('aiImgCancel');
+            const submitBtn = document.getElementById('aiImgSubmit');
+            const styleEl  = document.getElementById('aiImgStyle');
+            const aspectEl = document.getElementById('aiImgAspect');
+            const qualityEl = document.getElementById('aiImgQuality');
+            const sbId = @Model.Id;
+            const genUrl = '@Url.Action("GenerateAiScene", "Scenes", new { area = "User" })';
+
+            function getCsrf(){
+              const el = document.querySelector('input[name="__RequestVerificationToken"]');
+              return el ? el.value : '';
+            }
+
+            function openPop(){
+              pop.classList.add('open');
+              pop.setAttribute('aria-hidden','false');
+              if (promptEl){
+                promptEl.focus();
+                promptEl.select();
+              }
+            }
+            function closePop(){
+              pop.classList.remove('open');
+              pop.setAttribute('aria-hidden','true');
+              if (statusTextEl) statusTextEl.textContent = '';
+              if (spinnerEl) spinnerEl.style.display = 'none';
+              if (submitBtn) submitBtn.disabled = false;
+            }
+
+            btn.addEventListener('click', (e)=>{
+              e.stopPropagation();
+              if (pop.classList.contains('open')) closePop(); else openPop();
+            });
+            cancelBtn?.addEventListener('click', (e)=>{ e.preventDefault(); closePop(); });
+
+            document.addEventListener('click', (e)=>{
+              if (!pop.classList.contains('open')) return;
+              if (pop.contains(e.target) || e.target === btn) return;
+              closePop();
+            });
+            document.addEventListener('keydown', (e)=>{
+              if (e.key === 'Escape' && pop.classList.contains('open')){
+                e.stopPropagation();
+                closePop();
+              }
+            });
+
+            async function submit(){
+              if (!promptEl || !submitBtn) return;
+              const prompt = (promptEl.value || '').trim();
+              if (!prompt){
+                if (window.SB && SB.alert) SB.alert('Bitte gib eine kurze Beschreibung für das Bild ein.', 'warning', 'Prompt fehlt');
+                else alert('Bitte gib eine kurze Beschreibung für das Bild ein.');
+                promptEl.focus();
+                return;
+              }
+              submitBtn.disabled = true;
+              if (statusTextEl) statusTextEl.textContent = 'Bild wird generiert… dies kann bis zu 1–2 Minuten dauern.';
+              if (spinnerEl) spinnerEl.style.display = 'inline-block';
+              try {
+                const token = getCsrf();
+                const body = new URLSearchParams();
+                let finalPrompt = prompt;
+                const style = styleEl?.value || '';
+                if (style === 'realistic') {
+                  finalPrompt += ' – realistisch, fotorealistischer Stil';
+                } else if (style === 'cartoon') {
+                  finalPrompt += ' – im Cartoon-/Comic-Stil mit klaren Umrissen und kräftigen Farben';
+                } else if (style === 'illustration') {
+                  finalPrompt += ' – als farbige Illustration mit klarer Linienführung';
+                } else if (style === 'sketch') {
+                  finalPrompt += ' – als einfache Schwarz-Weiß-Skizze / Lineart';
+                }
+
+                const aspect = aspectEl?.value || '1:1';
+                const quality = qualityEl?.value || 'low';
+
+                body.append('storyboardId', String(sbId));
+                body.append('prompt', finalPrompt);
+                body.append('aspect', aspect);
+                body.append('quality', quality);
+                if (token) body.append('__RequestVerificationToken', token);
+
+                const res = await fetch(genUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                  body
+                });
+
+                const data = await res.json().catch(()=>null);
+                if (!res.ok || !data){
+                  const msg = (data && (data.error || data.detail)) || `Fehler ${res.status}`;
+                  if (window.SB && SB.alert) SB.alert(msg, 'error', 'Bildgenerierung fehlgeschlagen');
+                  else alert(msg);
+                  submitBtn.disabled = false;
+                  if (statusTextEl) statusTextEl.textContent = '';
+                  if (spinnerEl) spinnerEl.style.display = 'none';
+                  return;
+                }
+
+                if (data.success && data.url){
+                  if (window.SB && SB.toast) SB.toast('Neue KI-Szene erstellt.', 'success');
+                  window.location.href = data.url;
+                  return;
+                }
+                const msg2 = data.error || 'Unbekannter Fehler bei der Bildgenerierung.';
+                if (window.SB && SB.alert) SB.alert(msg2, 'error', 'Bildgenerierung fehlgeschlagen');
+                else alert(msg2);
+              } catch (err){
+                if (window.SB && SB.alert) SB.alert('Es ist ein Netzwerkfehler aufgetreten. Bitte versuche es erneut.', 'error', 'Bildgenerierung fehlgeschlagen');
+                else alert('Es ist ein Netzwerkfehler aufgetreten. Bitte versuche es erneut.');
+              } finally {
+                submitBtn.disabled = false;
+                if (statusTextEl) statusTextEl.textContent = '';
+                if (spinnerEl) spinnerEl.style.display = 'none';
+              }
+            }
+
+            submitBtn?.addEventListener('click', (e)=>{ e.preventDefault(); submit(); });
+            promptEl?.addEventListener('keydown', (e)=>{
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){
+                e.preventDefault();
+                submit();
+              }
+            });
+          })();
+
+          function taxoChain(v){
+            const n = (typeof v === 'number' && v>=0) ? v : (MAX_TAXO>=0?MAX_TAXO:null);
+            return (n==null) ? '' : TAXO_NAMES.slice(0, Math.min(n+1, TAXO_NAMES.length)).join(', ');
+          }
+
+          // Initialize Summernote for a given textarea element and bind to marker field
+          function initEditor(el, marker, field){
+            if (!el || !window.jQuery) return;
+            const $el = window.jQuery(el);
+            const initialValue = (typeof marker[field] === 'string') ? (marker[field] || '') : '';
+            let hydrating = true;
+            try{
+              $el.summernote({
+                height: 150,
+                toolbar: [
+                  ['style', ['bold','italic','underline','clear']],
+                  ['font', ['fontsize','color']],
+                  ['para', ['ul','ol','paragraph']],
+                  ['insert', ['link']],
+                  ['view', ['codeview']]
+                ],
+                callbacks: {
+                  onChange: function(contents){
+                    marker[field] = contents || '';
+                    if (hydrating) return; // ignore changes triggered during initial content setup
+                    const card = document.getElementById(`card-${marker.id}`);
+                    setDirty(marker, marker._badge, card, true);
+                  }
+                }
+              });
+              // set initial data without marking marker as dirty
+              $el.summernote('code', initialValue);
+              // flip hydration flag after the current tick so any init-triggered onChange is ignored
+              setTimeout(() => { hydrating = false; }, 0);
+              // track instance
+              if (!State.editors[marker.id]) State.editors[marker.id] = {};
+              State.editors[marker.id][field] = $el;
+            }catch(err){ console.warn('Summernote init failed', err); hydrating = false; }
+          }
+
+          function renderCards(){
+            const { cards } = State.els; cards.innerHTML='';
+
+            // destroy any existing editors before re-render to avoid leaks
+            try {
+              if (State.editors) {
+                Object.values(State.editors).forEach(map => {
+                  if (!map) return;
+                  Object.values(map).forEach(ed => { try { ed.summernote ? ed.summernote('destroy') : (ed.destroy && ed.destroy()); } catch {} });
+                });
+              }
+            } finally { State.editors = {}; }
+
+            const cmp = (a,b)=> (a.number - b.number) || (a.id - b.id);
+            const openId = State.openId;
+            const list = State.markers.slice().sort((a,b)=>{
+              if (openId != null) {
+                if (a.id === openId && b.id !== openId) return -1;
+                if (b.id === openId && a.id !== openId) return 1;
+              }
+              return cmp(a,b);
+            });
+
+            list.forEach(m=>{
+              const card = el('div','card'); card.id = `card-${m.id}`;
+
+              const head = el('div','head');
+              const headBadge = el('span','badge'); headBadge.textContent = m.number; headBadge.style.setProperty('--c', m.colorHex);
+              const title = el('div','title'); title.textContent = `Marker ${m.number}`;
+              const caret = el('span','caret');
+              head.appendChild(headBadge); head.appendChild(title); head.appendChild(caret);
+
+              const grid = el('div','grid');
+
+              // Top row: Nummer, Farbe, Taxonomie
+              grid.insertAdjacentHTML('beforeend', `
+                <div class="cell">
+                  <label>Nummer</label>
+                  <input data-field="number" type="number" min="1" step="1" value="${m.number}" />
+                </div>`);
+              grid.insertAdjacentHTML('beforeend', `
+                <div class="cell">
+                  <label>Farbe</label>
+                  <input data-field="colorHex" type="color" value="${m.colorHex}" />
+                </div>`);
+              if (MAX_TAXO >= 0) {
+                grid.insertAdjacentHTML('beforeend', `
+                  <div class="cell">
+                    <label>Taxonomie</label>
+                    <div class="taxo-chips" data-field="taxonomie"></div>
+                  </div>`);
+              }
+
+              // Below: Full-width fields
+              grid.insertAdjacentHTML('beforeend', `
+                <div class="full">
+                  <label>Ziel</label>
+                  <textarea data-field="ziel" rows="2"></textarea>
+                </div>
+                <div class="full">
+                  <label>Beschreibung</label>
+                  <textarea data-field="description"></textarea>
+                </div>
+                <div class="full">
+                  <label>URL-Datenablage</label>
+                  <div class="url-list" data-field="datenablage">
+                    <div class="rows"></div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+                      <button type="button" class="btn btn-outline add-url">+ URL hinzufügen</button>
+                      <small class="text-muted url-hint">Optional: Du kannst eine oder mehrere URLs angeben.</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="full">
+                  <label>Quellen</label>
+                  <textarea data-field="quellen" style="min-height: 120px;"></textarea>
+                </div>
+                <div class="full">
+                  <details class="acc ki-prompts">
+                    <summary>
+                      <span class="section-title" style="font-size:16px;color:var(--ink);font-weight:700;">
+                        <span class="acc-caret" aria-hidden="true"></span>
+                        KI &amp; Prompts (optional)
+                      </span>
+                    </summary>
+                    <div class="acc-body">
+                       <div class="full"><label>Prompt-Idee</label><textarea data-field="promptIdee" style="min-height: 150px;"></textarea></div>
+                      <div class="full"><label>Model</label><input data-field="model" type="text" /></div>
+                    </div>
+                  </details>
+                </div>
+                <div class="full">
+                  <label>Reflexion – Notizen</label>
+                  <textarea data-field="reflexion" style="min-height: 150px;"></textarea>
+                </div>`);
+
+              const row = el('div','row');
+              const coords = el('div','coords'); coords.textContent = `x: ${round2(m.x*100)}% • y: ${round2(m.y*100)}%`;
+              const unsaved = el('span','unsaved'); unsaved.innerHTML = `⚠️ Nicht gespeichert`; unsaved.title='Änderungen nicht gespeichert'; unsaved.style.display = m._dirty ? 'inline-flex' : 'none';
+
+              const save = el('button','btn btn-primary btn-save'); save.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Speichern`;
+              save.disabled=!m._dirty;
+
+              const del  = el('button','btn btn-danger btn-delete'); del.innerHTML = `<i class="bi bi-trash"></i> Löschen`;
+
+              const actions = el('div','form-actions');
+              actions.appendChild(save);
+              const divi = el('span','divider'); actions.appendChild(divi);
+              actions.appendChild(del);
+              row.appendChild(coords); row.appendChild(unsaved); row.appendChild(actions);
+
+              const body = el('div','body'); body.appendChild(grid); body.appendChild(row);
+              card.appendChild(head); card.appendChild(body); cards.appendChild(card);
+
+              // Bind fields
+              const zielIn  = grid.querySelector('[data-field="ziel"]');
+              const modelIn = grid.querySelector('[data-field="model"]');
+              const descTa  = grid.querySelector('[data-field="description"]');
+              const urlList = grid.querySelector('.url-list[data-field="datenablage"]');
+              const quelleTa = grid.querySelector('[data-field="quellen"]');
+              const prTa    = grid.querySelector('[data-field="promptIdee"]');
+              const reflTa  = grid.querySelector('[data-field="reflexion"]');
+              const colorIn = grid.querySelector('[data-field="colorHex"]');
+              const numIn   = grid.querySelector('[data-field="number"]');
+              const taxoWrap = grid.querySelector('.taxo-chips[data-field="taxonomie"]');
+
+              // hydrate base values for non-CKE fields
+              zielIn.value = m.ziel || '';
+              if (modelIn) modelIn.value = m.model || '';
+              descTa.value = m.description || '';
+              // URL list rows will be initialized below from m.datenablage
+
+              prTa.value = m.promptIdee || '';
+              if (quelleTa) quelleTa.value = m.quellen || '';
+              if (reflTa) reflTa.value = m.reflexion || '';
+
+              // attach Summernote to selected textareas (leave URL-Datenablage as plain textarea for URL validation)
+              initEditor(zielIn, m, 'ziel');
+              initEditor(descTa, m, 'description');
+              initEditor(quelleTa, m, 'quellen');
+              initEditor(prTa, m, 'promptIdee');
+              initEditor(reflTa, m, 'reflexion');
+
+              // if taxo chips exist, render chips + title now
+              if (taxoWrap && MAX_TAXO >= 0) {
+                taxoWrap.innerHTML = buildTaxoChips(typeof m.taxonomie==='number'?m.taxonomie:null);
+                taxoWrap.title = taxoChain(m.taxonomie) || taxoChain(null) || '';
+                // click handlers: selecting level i sets marker.taxonomie=i and highlights 0..i
+                taxoWrap.querySelectorAll('button.chip').forEach((btn) => {
+                  btn.addEventListener('click', () => {
+                    const v = parseInt(btn.dataset.val, 10);
+                    if (!Number.isNaN(v)) {
+                      m.taxonomie = v;
+                      taxoWrap.title = taxoChain(v) || '';
+                      taxoWrap.querySelectorAll('button.chip').forEach((c, j) => c.classList.toggle('active', j <= v));
+                      setDirty(m, m._badge, card, true);
+                    }
+                  });
+                });
+              }
+
+              // URL list setup and listeners
+              if (urlList){
+                const rows = urlList.querySelector('.rows');
+                const addBtn = urlList.querySelector('.add-url');
+                const hint = urlList.querySelector('.url-hint');
+                const parseStored = (m.datenablage||'').split(/[\n,;\s]+/g).map(s=>s.trim()).filter(Boolean);
+
+                function isValidUrl(u){ try{ const x=new URL(u); return x.protocol==='http:'||x.protocol==='https:'; } catch { return false; } }
+                function inputs(){ return Array.from(rows.querySelectorAll('input.url-input')); }
+                function collect(){ return inputs().map(i=> (i.value||'').trim()).filter(Boolean); }
+                function updateHint(){
+                  const list = collect();
+                  const has = list.length>0;
+                  const all = !has || list.every(isValidUrl);
+                  if (!hint) return;
+                  if (!has){ hint.textContent='Optional: Du kannst eine oder mehrere URLs angeben.'; hint.classList.remove('error'); }
+                  else if (all){ hint.textContent = `OK • ${list.length} URL${list.length>1?'s':''}`; hint.classList.remove('error'); }
+                  else { hint.textContent='Bitte gültige http/https-URLs angeben.'; hint.classList.add('error'); }
+                }
+                function sync(){ m.datenablage = collect().join('\n'); setDirty(m, m._badge, card, true); updateHint(); }
+                function validateInput(inp){ const v=(inp.value||'').trim(); const ok=!v || isValidUrl(v); inp.classList.toggle('invalid', !ok); }
+                function addRow(val=''){
+                  const row=document.createElement('div'); row.className='url-row';
+                  const inp=document.createElement('input'); inp.type='url'; inp.placeholder='https://…'; inp.className='form-control url-input'; inp.value=val;
+                  inp.addEventListener('input', ()=>{ validateInput(inp); sync(); });
+                  const rm=document.createElement('button'); rm.type='button'; rm.className='rm'; rm.textContent='Entfernen';
+                  rm.addEventListener('click', ()=>{ row.remove(); sync(); });
+                  row.appendChild(inp); row.appendChild(rm); rows.appendChild(row);
+                  validateInput(inp);
+                }
+                (parseStored.length?parseStored:['']).forEach(v=>addRow(v));
+                updateHint();
+                addBtn?.addEventListener('click', ()=>{ addRow(''); const last=inputs().at(-1); last?.focus(); });
+              }
+
+              // CKEditor handles Ziel and Beschreibung and Prompt-Idee change events.
+              modelIn?.addEventListener('input', ()=>{ m.model=modelIn.value; setDirty(m, m._badge, card, true); });
+              colorIn.addEventListener('input', ()=>{ m.colorHex = colorIn.value; if (m._badge) m._badge.style.setProperty('--c', m.colorHex); headBadge.style.setProperty('--c', m.colorHex); setDirty(m, m._badge, card, true); });
+              numIn.addEventListener('change', ()=>{ const n = parseInt(numIn.value || '1', 10); if (!Number.isNaN(n)) { m.number = n; headBadge.textContent = m.number; if (m._badge) m._badge.textContent = m.number; title.textContent = `Marker ${m.number}`; setDirty(m, m._badge, card, true); } });
+
+              save.addEventListener('click', async () => {
+                const inputs = urlList ? Array.from(urlList.querySelectorAll('input.url-input')) : [];
+                const urls = inputs.map(i => (i.value||'').trim()).filter(Boolean);
+                const allValid = urls.every(u => { try { const x=new URL(u); return x.protocol==='http:'||x.protocol==='https:'; } catch { return false; } });
+                if (urls.length>0 && !allValid) {
+                  alert('Die URL-Datenablage enthält ungültige Einträge.');
+                  const bad = inputs.find(i => i.classList.contains('invalid')) || inputs[0];
+                  bad?.focus();
+                  return;
+                }
+                m.datenablage = urls.join('\n');
+
+                try {
+                  await api.update(State.sceneId, m.id, {
+                    x:m.x, y:m.y, number:m.number, colorHex:m.colorHex,
+                    description:m.description??'', ziel:m.ziel??'',
+                    datenablage:m.datenablage??'', quellen:m.quellen??'', promptIdee:m.promptIdee??'',
+                    reflexion:m.reflexion??'',
+                    model:m.model??'', taxonomie:(typeof m.taxonomie==='number'? m.taxonomie : null)
+                  });
+                  setDirty(m, m._badge, card, false);
+                } catch (err) { alert('Save failed: ' + (err?.message||err)); }
+              });
+
+              del.addEventListener('click', async ()=>{
+                if(!confirm('Delete this marker?')) return;
+                // cleanup editors for this marker first
+                const eds = State.editors[m.id] || {};
+                Object.values(eds).forEach(ed => { try { ed.summernote ? ed.summernote('destroy') : (ed.destroy && ed.destroy()); } catch {} });
+                delete State.editors[m.id];
+                await api.remove(State.sceneId, m.id);
+                State.markers = State.markers.filter(x=>x.id!==m.id);
+                renderOverlay(); renderCards();
+              });
+
+              if (State.openId === m.id) card.classList.add('open');
+              head.addEventListener('click', ()=>{
+                if (State.openId === m.id) {
+                  State.openId = null;
+                  card.classList.remove('open');
+                } else {
+                  openMarkerCard(m.id);
+                }
+              });
+            });
+          }
+
+          function openMarkerCard(id){
+            State.openId = id;
+            const { cards } = State.els;
+            document.querySelectorAll('#cards .card').forEach(c=>c.classList.remove('open'));
+            const card = document.getElementById(`card-${id}`);
+            if (card){
+              // move active card to top
+              cards.insertBefore(card, cards.firstChild);
+              card.classList.add('open');
+              card.scrollIntoView({behavior:'smooth', block:'nearest'});
+            }
+            document.querySelectorAll('.num-badge').forEach(d=>d.classList.remove('selected'));
+            const m = State.markers.find(x=>x.id===id); m?._badge?.classList.add('selected');
+          }
+
+          function validateDatenablage(textarea){
+            const raw = String(textarea.value || "");
+            const urls = raw ? raw.split(/[\n,;\s]+/g).map(s=>s.trim()).filter(Boolean) : [];
+            const hasContent = urls.length > 0;
+            const allValid = !hasContent || urls.every(u => { try { const x = new URL(u); return x.protocol === 'http:' || x.protocol === 'https:'; } catch { return false; } });
+            textarea.classList.toggle('invalid', !allValid && hasContent);
+            let hint = textarea.parentElement.querySelector('.url-hint');
+            if (!hint) { hint = document.createElement('div'); hint.className='url-hint'; textarea.parentElement.appendChild(hint); }
+            if (!hasContent) { hint.textContent = 'Optional: Du kannst eine oder mehrere URLs angeben.'; hint.classList.remove('error'); }
+            else if (allValid) { hint.textContent = `OK • ${urls.length} URL${urls.length>1?'s':''}`; hint.classList.remove('error'); }
+            else { hint.textContent = 'Bitte gültige http/https-URLs angeben.'; hint.classList.add('error'); }
+            return { allValid, urls, normalized: urls.join('\n') };
+          }
+
+          /* boot */
+          document.addEventListener('DOMContentLoaded', async ()=>{
+            const img = document.getElementById('scene');
+            const overlay = document.getElementById('overlay');
+            const cards = document.getElementById('cards');
+            const board = document.getElementById('board');
+            if (!board) return;
+
+            State.els = { img, overlay, cards };
+            State.sceneId = parseInt(board.dataset.sceneId);
+
+            const load = async ()=>{ const ms = await api.list(State.sceneId); State.markers = (ms||[]).map(N); renderOverlay(); renderCards(); };
+            if (img?.complete) load(); else img?.addEventListener('load', load, { once:true });
+
+            overlay?.addEventListener('click', e=>{ if (e.target.closest('.dot-wrap')) return; if (State.creatingMarker) return; addMarkerAt(e.clientX, e.clientY); });
+
+            const reflow = ()=>renderOverlay();
+            window.addEventListener('resize', reflow);
+            window.addEventListener('orientationchange', reflow);
+
+            // Share defaults
+            document.getElementById('shareAllowEdit').checked = false;
+            document.getElementById('shareLink').value = `${baseLink}`;
+            document.getElementById('shareHint').textContent = 'Nur Lesezugriff. Sicher zum Weitergeben.';
+          });
+
+          async function addMarkerAt(clientX, clientY){
+            if (State.creatingMarker) return;
+            State.creatingMarker = true;
+            try {
+              const { img } = State.els;
+              const rect = img.getBoundingClientRect();
+              const x = (clientX - rect.left) / img.clientWidth;
+              const y = (clientY - rect.top)  / img.clientHeight;
+              const created = await api.create(State.sceneId, x, y, '#89ba17');
+              const m = N(created || {});
+              if (!State.markers.some(x => x.id === m.id)) { State.markers.push(m); }
+              State.openId = m.id; renderOverlay(); renderCards(); openMarkerCard(m.id);
+            } finally { State.creatingMarker = false; }
+          }
+        })();
+    </script>
+}

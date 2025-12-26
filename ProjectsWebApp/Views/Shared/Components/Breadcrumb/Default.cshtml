@@ -1,0 +1,73 @@
+@model List<(string Title, string Url)>
+
+<style>
+.breadcrumb {
+    font-size: 0.95rem;
+    --bs-breadcrumb-divider-color: #adb5bd;
+}
+
+.breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+    color: #adb5bd;
+    content: "›"; /* More modern than "/" */
+    font-weight: bold;
+}
+
+.breadcrumb a {
+    transition: color 0.2s ease;
+}
+
+.breadcrumb a:hover {
+    color: #90bcf9 !important;
+    text-decoration: underline;
+}
+
+.breadcrumb-item.active {
+    color: #495057;
+}
+
+</style>
+
+@functions {
+    string TruncateWords(string s, int maxWords = 8, int maxChars = 80)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return s;
+        var words = s.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var text = s;
+        if (words.Length > maxWords)
+        {
+            text = string.Join(" ", words.Take(maxWords)) + "…";
+        }
+        if (text.Length > maxChars)
+        {
+            text = text.Substring(0, Math.Min(maxChars, text.Length)).TrimEnd() + "…";
+        }
+        return text;
+    }
+}
+
+@if (Model != null && Model.Any())
+{
+    <nav aria-label="breadcrumb" class="mt-2 mb-4">
+        <ol class="breadcrumb bg-transparent p-0 m-0">
+            @for (int i = 0; i < Model.Count; i++)
+            {
+                var crumb = Model[i];
+                bool isLast = i == Model.Count - 1;
+                var titleText = isLast ? TruncateWords(crumb.Title) : crumb.Title;
+
+                <li class="breadcrumb-item @(isLast ? "active fw-semibold" : "")" @(isLast ? "aria-current=\"page\"" : "")>
+                    @if (!string.IsNullOrEmpty(crumb.Url) && !isLast)
+                    {
+                        <a href="@crumb.Url" class="text-decoration-none text-muted hover-effect">
+                            @Html.Raw(titleText)
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="text-dark"> @Html.Raw(titleText)</span>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}

@@ -1,0 +1,74 @@
+﻿@model UrheberrechtContent
+
+@{
+    ViewData["Title"] = "Urheberrecht-Managment";
+}
+
+
+<div class="container mt-5">
+    <h2>@(Model.Id == 0 ? "Urheberrecht Inhalt hinzufügen" : "Urheberrecht Inhalt bearbeiten")</h2>
+
+  
+    <form asp-action="Upsert" method="post">
+        <input type="hidden" asp-for="Id" />
+
+      
+          
+        
+
+        <div class="form-group mt-3">
+            <label for="SectionType"><strong>Feld Typ</strong></label>
+            <select asp-for="SectionType" class="form-control" required>
+                <option value="Text">Text (CKEditor)</option>
+                <option value="Accordion">Accordion</option>
+            </select>
+            <span asp-validation-for="SectionType" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mt-3">
+            <label for="Title"><strong>Titel</strong></label>
+            <input asp-for="Title" class="form-control" required />
+            <span asp-validation-for="Title" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mt-3">
+            <label for="ContentHtml"><strong>Inhalt</strong></label>
+            <textarea asp-for="ContentHtml" class="form-control" id="Content" rows="10"></textarea>
+            <span asp-validation-for="ContentHtml" class="text-danger"></span>
+        </div>
+
+        @* <button type="submit" class="btn mt-3" style="background:black;color:white;">Speichern</button> *@
+
+      
+        <div class="d-flex justify-content-end mt-3 gap-2 flex-wrap mb-3">
+            <a asp-action="Index" class="btn btn-secondary">Abbrechen</a>
+            <button type="submit" class="btn  me-2" style="color:white;background:black;"> <i class="bi bi-check-lg me-1"></i> Speichern</button>
+
+            <div/>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
+    <script>
+        (function(){
+          document.addEventListener('DOMContentLoaded', function(){
+            const el = document.querySelector('#Content');
+            if (!el || !window.jQuery) return;
+            window.jQuery(el).summernote({
+              height: 350,
+              placeholder: 'Inhalt eingeben …',
+              toolbar: [
+                ['style', ['bold', 'italic', 'underline', 'clear']],
+                ['font', ['fontsize', 'color']],
+                ['para', ['ul', 'ol', 'paragraph']],
+                ['insert', ['picture', 'video', 'link']],
+                ['view', ['codeview']]
+              ]
+            });
+          });
+        })();
+    </script>
+}

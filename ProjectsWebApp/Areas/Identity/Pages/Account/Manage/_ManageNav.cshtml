@@ -1,0 +1,87 @@
+﻿@inject SignInManager<IdentityUser> SignInManager
+@{
+    var hasExternalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).Any();
+}
+<style>
+    .nav-pills .nav-link.active {
+        background: #000000; /* fallback for old browsers */
+        background: -webkit-linear-gradient(to right, #434343, #000000); /* Chrome 10-25, Safari 5.1-6 */
+        background: linear-gradient(to right, #434343, #000000); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+
+        color: white; /* Gute Lesbarkeit */
+        font-weight: bold; /* Optional: Text fett für Betonung */
+        border-radius: 4px; /* Optional: leicht abgerundete Ecken */
+    }
+
+    .nav-pills .nav-link {
+        color: #6c757d; /* Standard-Linkfarbe */
+        transition: background-color 0.2s ease; /* Sanfter Übergang */
+    }
+
+        .nav-pills .nav-link:hover {
+            background: #000000; /* fallback for old browsers */
+            background: -webkit-linear-gradient(to right, #434343, #000000); /* Chrome 10-25, Safari 5.1-6 */
+            background: linear-gradient(to right, #434343, #000000); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+
+            color: white;
+        }
+
+</style>
+<ul class="nav nav-pills flex-column">
+    <!-- Profiel -->
+    <li class="nav-item">
+        <a class="nav-link @ManageNavPages.IndexNavClass(ViewContext)"
+           id="profiel"
+           asp-page="./Index">
+            Profil
+        </a>
+    </li>
+
+    <!-- E-mailadres -->
+    <li class="nav-item">
+        <a class="nav-link @ManageNavPages.EmailNavClass(ViewContext)"
+           id="email"
+           asp-page="./Email">
+            E-Mail-Adresse
+        </a>
+    </li>
+
+    <!-- Wachtwoord wijzigen -->
+    <li class="nav-item">
+        <a class="nav-link @ManageNavPages.ChangePasswordNavClass(ViewContext)"
+           id="wachtwoord-wijzigen"
+           asp-page="./ChangePassword">
+            Passwort ändern
+        </a>
+    </li>
+
+    @if (hasExternalLogins)
+    {
+        <!-- Externe aanmeldingen -->
+        <li class="nav-item">
+            <a class="nav-link @ManageNavPages.ExternalLoginsNavClass(ViewContext)"
+               id="externe-aanmeldingen"
+               asp-page="./ExternalLogins">
+                Externe Anmeldungen
+            </a>
+        </li>
+    }
+
+    <li class="nav-item">
+        <a class="nav-link @ManageNavPages.TwoFactorAuthenticationNavClass(ViewContext)"
+           asp-page="./TwoFactorAuthentication">2-Schritt-Verfahren</a>
+    </li>
+
+    @if (User.IsInRole("Admin"))
+    {
+        <!-- Beheerders beheren -->
+        <li class="nav-item">
+            <a class="nav-link @ManageNavPages.ManageAdminsNavClass(ViewContext)"
+               id="beheerders-beheren"
+               asp-page="./ManageAdmins">
+                Benutzer verwalten
+            </a>
+        </li>
+    }
+</ul>
+

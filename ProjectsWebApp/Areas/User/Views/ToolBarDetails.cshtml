@@ -1,0 +1,137 @@
+﻿@model MakerSpaceProject
+
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<style>
+    .details-container {
+        max-width: 1250px;
+        min-height: 600px;
+        margin: 10px auto;
+        padding: 30px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        text-align: left;
+    }
+
+    .details-header {
+        display: block;
+        text-align: left;
+    }
+
+    .tag-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
+        .tag-badges .badge {
+            background-color: #90bc14;
+            color: white;
+            font-size: 0.85rem;
+            padding: 6px 10px;
+            border-radius: 20px;
+        }
+
+    .details-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 20px;
+        text-align: left;
+    }
+
+    .details-description {
+        font-size: 1.05rem;
+        line-height: 1.7;
+        color: #555;
+        white-space: pre-line;
+        text-align: left;
+    }
+
+    .external-link {
+        display: inline-block;
+        margin-top: 30px;
+        padding: 10px 18px;
+        background-color: #90bc14;
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        border-radius: 30px;
+        transition: all 0.2s ease-in-out;
+    }
+
+        .external-link:hover {
+            background-color: #76a614;
+            color: #fff;
+        }
+
+    .back-btn {
+        margin-top: 40px;
+        display: inline-block;
+        text-decoration: underline;
+        color: #888;
+        font-size: 0.95rem;
+        text-align: left;
+    }
+
+    @@media (max-width: 768px) {
+        .details-header h1 {
+            font-size: 1.6rem;
+        }
+
+        .external-link {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+
+<div class="details-container">
+    <div class="details-header">
+        @if (!string.IsNullOrEmpty(Model.Tags))
+        {
+            var tags = Model.Tags.Split(',').Select(t => t.Trim()).Where(t => !string.IsNullOrWhiteSpace(t));
+            <div class="tag-badges">
+                @foreach (var tag in tags)
+                {
+                    <span class="badge">@tag</span>
+                }
+            </div>
+        }
+
+        <h1>@Model.Title</h1>
+    </div>
+
+    <div class="details-description">
+        @Html.Raw(Model.Description)
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ProjectUrl))
+    {
+        <a class="external-link" href="@Model.ProjectUrl" target="_blank">
+            Externen Link öffnen <i class="bi bi-box-arrow-up-right ms-1"></i>
+        </a>
+    }
+
+    
+</div>
+
+<div class="mt-4">
+    <a class="back-btn" href="@Url.Action("ToolBar", "Home", new { area = "User" })">
+        &larr; Zurück zur Übersicht
+    </a>
+</div>
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.details-description a').forEach(function (link) {
+                link.setAttribute('target', '_blank');
+            });
+        });
+    </script>
+}

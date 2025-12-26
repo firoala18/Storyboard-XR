@@ -1,0 +1,110 @@
+﻿@model IEnumerable<ImpressumContent>
+@{
+    ViewData["Title"] = "Impressum";
+    ViewBag.FullWidth = true;
+}
+<style>
+    /* Styling for normal text sections */
+    .text-section {
+        margin: 20px 0;
+        padding: 20px;
+        /* border: 1px solid #ddd; */
+        /* border-radius: 10px; */
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+        .text-section h2 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .text-section p,
+        .text-section div {
+            color: #555;
+            line-height: 1.6;
+        }
+    /* Accordion styles */
+    .accordion-item {
+        margin-bottom: 15px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .accordion-header {
+        padding: 20px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #5d8c09;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .accordion-body {
+        padding: 20px;
+        display: none;
+        font-size: 1rem;
+        color: #555;
+        line-height: 1.6;
+    }
+
+    .accordion-header.active + .accordion-body {
+        display: block;
+    }
+
+    .accordion-icon {
+        font-size: 1.5rem;
+        transition: transform 0.3s;
+    }
+
+    .accordion-header.active .accordion-icon {
+        transform: rotate(45deg);
+    }
+</style>
+
+@foreach (var item in Model.OrderBy(x => x.DisplayOrder))
+{
+    if (item.SectionType == "Text")
+    {
+        <!-- Plain text section rendered as CKEditor-edited HTML -->
+        <div class="text-section">
+            <h2>@item.Title</h2>
+            @Html.Raw(item.ContentHtml)
+        </div>
+    }
+    else if (item.SectionType == "Accordion")
+    {
+        <!-- Accordion section -->
+        <div class="accordion-item">
+            <div class="accordion-header">
+                @item.Title
+                <span class="accordion-icon">+</span>
+            </div>
+            <div class="accordion-body">
+                @Html.Raw(item.ContentHtml)
+            </div>
+        </div>
+    }
+}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var headers = document.querySelectorAll('.accordion-header');
+        headers.forEach(function (header) {
+            header.addEventListener('click', function () {
+                header.classList.toggle('active');
+                var body = header.nextElementSibling;
+                if (body.style.display === "block") {
+                    body.style.display = "none";
+                } else {
+                    body.style.display = "block";
+                }
+            });
+        });
+    });
+</script>

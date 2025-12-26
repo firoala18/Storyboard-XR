@@ -1,0 +1,44 @@
+@model IEnumerable<ProjectsWebApp.Models.LockedAccountViewModel>
+@{
+    ViewData["Title"] = "Gesperrte Konten";
+}
+
+<h2>Komplett gesperrte Konten</h2>
+<p>
+    Diese Konten wurden nach mehreren automatischen Sperren vollständig gesperrt und müssen manuell durch eine*n Admin
+    reaktiviert werden.
+</p>
+
+@if (!Model.Any())
+{
+    <p>Derzeit gibt es keine komplett gesperrten Konten.</p>
+}
+else
+{
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Anzahl Lockouts</th>
+                <th>Lockout bis</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.Email</td>
+                <td>@item.LockoutCount</td>
+                <td>@(item.LockoutEnd?.ToString("u") ?? "unbegrenzt")</td>
+                <td>
+                    <form asp-action="Unlock" method="post" asp-route-id="@item.UserId" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-success">Konto reaktivieren</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,52 @@
+﻿@* Shared Partial: XRLab Dropdown *@
+
+<div class="dropdown-menu p-3 border-0 shadow-lg w-100"
+     style="max-width: 420px; background-color: #fff;"
+     aria-labelledby="xrLabDropdown">
+
+    <!-- XRLab Projekte Card -->
+    <a class="dropdown-item p-0 mb-3 rounded-4 overflow-hidden d-block text-decoration-none shadow-sm"
+       asp-area="User"
+       asp-controller="Home"
+       asp-action="XRLab"
+       style="transition: all 0.3s ease;">
+        <div class="card border-0 h-100">
+            <div class="position-relative">
+                <img src="/images/xrlab_projects.jpg" class="card-img-top" alt="XRLab Projekte"
+                     style="height: 200px; object-fit: cover; width: 100%;">
+                <span class="position-absolute top-0 end-0 m-2 badge bg-success">Neu</span>
+            </div>
+            <div class="card-body">
+                <h6 class="card-title fw-bold text-dark mb-2" style="white-space: normal;">XRLab Projekte</h6>
+                <p class="card-text text-muted small mb-0" style="line-height: 1.4; word-wrap: break-word;">
+                    Erkunden Sie immersive AR/VR-Projekte mit modernster Technologie.
+                </p>
+            </div>
+        </div>
+    </a>
+
+    <!-- Divider -->
+    <div class="text-center my-2 opacity-50">
+        <i class="fas fa-minus fa-sm" style="color: #90bc14;"></i>
+    </div>
+
+    <!-- Gesamtportfolio Card -->
+    <a class="dropdown-item p-0 mt-3 rounded-4 overflow-hidden d-block text-decoration-none shadow-sm"
+       asp-area=""
+       asp-controller="Home"
+       asp-action="Index"
+       style="transition: all 0.3s ease;">
+        <div class="card border-0 h-100">
+            <div class="position-relative">
+                <img src="/images/general_projects.jpg" class="card-img-top" alt="Alle Projekte"
+                     style="height: 200px; object-fit: cover; width: 100%;">
+            </div>
+            <div class="card-body">
+                <h6 class="card-title fw-bold text-dark mb-2" style="white-space: normal;">Gesamtportfolio</h6>
+                <p class="card-text text-muted small mb-0" style="line-height: 1.4; word-wrap: break-word;">
+                    Alle Projektbereiche des VisionBoards kompakt zusammengefasst.
+                </p>
+            </div>
+        </div>
+    </a>
+</div>

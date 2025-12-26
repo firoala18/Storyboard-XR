@@ -1,0 +1,132 @@
+﻿@model IEnumerable<UrheberrechtContent>
+
+@{
+    ViewData["Title"] = "Urheberrecht";
+    ViewBag.FullWidth = true;
+}
+
+<style>
+    /* Styling for CKEditor-based text sections */
+    .text-section {
+        margin: 20px 0;
+        padding: 20px;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+        .text-section h2 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .text-section p,
+        .text-section div {
+            color: #555;
+            line-height: 1.6;
+        }
+
+    /* Accordion Styling */
+    .accordion-item {
+        margin-bottom: 15px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+    }
+
+        .accordion-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+    .accordion-header {
+        background: #ffffff;
+        padding: 20px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #5d8c09;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.3s;
+    }
+
+        .accordion-header:hover {
+            background: #f0f0f0;
+        }
+
+    .accordion-body {
+        padding: 20px;
+        display: none;
+        font-size: 1rem;
+        color: #555;
+        line-height: 1.6;
+        border-top: 1px solid #e0e0e0;
+        animation: slideDown 0.5s ease-in-out;
+    }
+
+        .accordion-body.active {
+            display: block;
+        }
+
+    .accordion-icon {
+        font-size: 1.5rem;
+        transition: transform 0.3s ease;
+    }
+
+    .accordion-header.active .accordion-icon {
+        transform: rotate(45deg);
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+@* Loop through all content sections based on DisplayOrder *@
+@foreach (var item in Model.OrderBy(d => d.DisplayOrder))
+{
+    if (item.SectionType == "Text")
+    {
+        <div class="text-section">
+            <h2>@item.Title</h2>
+            @Html.Raw(item.ContentHtml)
+        </div>
+    }
+    else if (item.SectionType == "Accordion")
+    {
+        <div class="accordion-item mt-3 mb-3">
+            <div class="accordion-header">
+                @item.Title
+                <span class="accordion-icon">+</span>
+            </div>
+            <div class="accordion-body">
+                @Html.Raw(item.ContentHtml)
+            </div>
+        </div>
+    }
+}
+
+<script>
+    // Accordion toggle functionality
+    document.addEventListener('DOMContentLoaded', function () {
+        const accordionHeaders = document.querySelectorAll('.accordion-header');
+        accordionHeaders.forEach(header => {
+            header.addEventListener('click', function () {
+                const body = header.nextElementSibling;
+                body.classList.toggle('active');
+                header.classList.toggle('active');
+            });
+        });
+    });
+</script>

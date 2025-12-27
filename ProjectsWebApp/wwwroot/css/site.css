@@ -9,7 +9,6 @@ html {
     flex-direction: column;
     justify-content: space-between;
     transition: font-size 0.2s ease-in-out;
-
 }
 
 
@@ -63,9 +62,9 @@ html {
             background:black;
         }
 .filter-dropdown-button.active-filter {
-    background-color: #89ba17;
+    background-color: #90bc14;
     color: white;
-    border-color: #89ba17;
+    border-color: #90bc14;
 }
 
 #clearFiltersBtn.highlighted {
@@ -181,8 +180,7 @@ body.contrast-mode .kontrast-btn {
     }
 
 .img-fluid {
-    /* Avoid global left margin that can overlap header controls */
-    margin-left: 0;
+    margin-left: 30%;
 }
 
 .navbar-collapse {
@@ -338,12 +336,95 @@ footer,
     padding: 0 15px !important;
 }
 
-.section-full .container,
-.section-full .container-fluid {
-    max-width: 100% !important;
-    width: 100% !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+/* ===== SweetAlert2 – compact, pretty, responsive ===== */
+.swal2-container.swal2-backdrop-show,
+.swal2-container.swal2-noanimation {
+  background: rgba(16,24,40,.35) !important;
+  backdrop-filter: blur(3px);
+}
+
+.swal2-popup {
+  width: min(560px, 92vw) !important; /* reasonable width on large screens */
+  border-radius: 14px !important;
+  padding: 1.1rem 1.25rem !important;
+  box-shadow: 0 24px 60px rgba(2,6,23,.25), 0 6px 18px rgba(2,6,23,.18) !important;
+  border: 1px solid #e5e7eb !important;
+  max-height: 80vh !important; /* never grow too tall */
+}
+
+.swal2-title {
+  margin: 0 0 .25rem 0 !important;
+  font-size: 1.125rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.swal2-html-container {
+  margin: .35rem 0 .2rem 0 !important;
+  font-size: .98rem !important;
+  line-height: 1.5 !important;
+  color: #334155 !important;
+  max-height: calc(80vh - 7rem) !important; /* leave room for title + buttons */
+  overflow: auto !important;
+}
+
+.swal2-close {
+  display: none !important; /* hide the X button */
+}
+
+.swal2-actions {
+  margin-top: .8rem !important;
+}
+.swal2-actions .swal2-confirm {
+  background-color: #90bc14 !important; /* match app green */
+  color: #fff !important;
+  border: 1px solid #90bc14 !important;
+  border-radius: .6rem !important;
+  padding: .5rem 1rem !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+.swal2-actions .swal2-cancel {
+  background: #fff !important;
+  color: #0f172a !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: .6rem !important;
+  padding: .5rem 1rem !important;
+  font-weight: 600 !important;
+}
+
+/* Keep OK button color constant: no hover/focus/active changes */
+.swal2-actions .swal2-confirm,
+.swal2-styled.swal2-confirm {
+  transition: none !important;
+}
+.swal2-actions .swal2-confirm:hover,
+.swal2-actions .swal2-confirm:focus,
+.swal2-actions .swal2-confirm:active,
+.swal2-styled.swal2-confirm:hover,
+.swal2-styled.swal2-confirm:focus,
+.swal2-styled.swal2-confirm:active {
+  background-color: #90bc14 !important;
+  border-color: #90bc14 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  filter: none !important;
+}
+
+/* Highest-specificity lock for any theme default overrides */
+.swal2-container .swal2-actions .swal2-styled.swal2-confirm,
+.swal2-container .swal2-actions .swal2-styled.swal2-confirm:hover,
+.swal2-container .swal2-actions .swal2-styled.swal2-confirm:focus,
+.swal2-container .swal2-actions .swal2-styled.swal2-confirm:active {
+  background-color: #90bc14 !important;
+  border-color: #90bc14 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  outline: none !important;
+  filter: none !important;
+  background-image: none !important;
+  -webkit-appearance: none;
 }
 
 @media (max-width: 768px) {
@@ -360,279 +441,39 @@ footer,
 
 
 
-:root {
-    --bg: #0b0c10;
-    --panel: #15171c;
-    --text: #e8eaf0;
-    --muted: #9aa1ac;
-    --brand: #78a7ff;
-    --danger: #ff6b6b;
+
+/* ========================
+   FORM CONTROLS POLISH
+   Subtle inner highlight so fields don't blend into white background
+========================= */
+.form-control,
+.form-select,
+textarea.form-control {
+  box-shadow: inset 0 0px 4px #b1eccd;
 }
 
-* {
-    box-sizing: border-box
+/* Retain consistent look inside input groups */
+.input-group .form-control {
+  box-shadow: inset 0 0px 5px #d1f3e1;
 }
 
-body {
-    margin: 0;
-    font-family: system-ui,-apple-system,Segoe UI,Roboto;
-    background: var(--bg);
-    color: var(--text);
+/* CKEditor content area: match input inner highlight */
+.ck.ck-editor .ck-content {
+  box-shadow: inset 0 0px 6px #d1f3e1;
 }
 
-.container {
-    width: min(1100px, 92%);
-    margin-inline: auto;
-    padding: 24px 0;
+/* Softer placeholder color for comfort */
+.form-control::placeholder { color: #9aa4b2; opacity: 1; }
+
+
+/* Auth fields: no inner highlight on Email/Password */
+input[type="email"].form-control,
+input[type="password"].form-control,
+.input-group input[type="email"].form-control,
+.input-group input[type="password"].form-control {
+  background-image: none !important;
+  box-shadow: none !important;
 }
 
 
 
-.brand {
-    color: var(--text);
-    text-decoration: none;
-    font-weight: 700;
-}
-
-h1, h2 {
-    margin: 8px 0 12px;
-}
-
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--panel);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-    .table th, .table td {
-        padding: 12px 14px;
-        border-bottom: 1px solid #222;
-    }
-
-    .table tr:last-child td {
-        border-bottom: none;
-    }
-
-.thumb {
-    width: 120px;
-    height: auto;
-    border-radius: 8px;
-}
-
-.actions {
-    display: flex;
-    gap: 10px;
-    align-items: center
-}
-
-.link {
-    background: none;
-    border: none;
-    color: var(--brand);
-    cursor: pointer;
-    padding: 0
-}
-
-    .link.danger {
-        color: var(--danger)
-    }
-
-.btn {
-    background: var(--brand);
-    color: #021024;
-    border: none;
-    padding: 10px 14px;
-    border-radius: 10px;
-    cursor: pointer;
-    text-decoration: none;
-}
-
-    .btn.ghost {
-        background: transparent;
-        color: var(--text);
-        border: 1px solid #2a2f39;
-    }
-
-.form {
-    background: var(--panel);
-    padding: 16px;
-    border-radius: 12px;
-}
-
-.form-row {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: 10px 0
-}
-
-label {
-    color: var(--muted)
-}
-
-.form input[type=text], .form input[type=file], .form input:not([type]), .form textarea {
-    background: #0f1116;
-    color: var(--text);
-    border: 1px solid #242833;
-    border-radius: 10px;
-    padding: 10px;
-}
-
-.hint {
-    color: var(--muted);
-    font-size: .9rem;
-}
-
-.details-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.board {
-    position: relative;
-    display: inline-block;
-    background: #0f1116;
-    border: 1px solid #242833;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-    .board img {
-        display: block;
-        max-width: 100%;
-        height: auto;
-    }
-
-.overlay {
-    position: absolute;
-    inset: 0;
-}
-
-.marker-dot {
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--brand);
-    border: 2px solid #021024;
-    cursor: pointer;
-    transform: translate(-50%, -50%);
-}
-
-    .marker-dot.selected {
-        outline: 3px solid rgba(255,255,255,.3);
-    }
-
-.desc-list {
-    list-style: none;
-    padding: 0;
-    margin: 14px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px
-}
-
-.desc-item {
-    background: var(--panel);
-    border: 1px solid #242833;
-    border-radius: 10px;
-    padding: 10px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
-    align-items: center
-}
-
-    .desc-item textarea {
-        width: 100%;
-        min-height: 54px;
-        resize: vertical
-    }
-
-    .desc-item .coords {
-        font-size: .85rem;
-        color: var(--muted)
-    }
-
-.delete {
-    background: none;
-    border: 1px solid #3a1f23;
-    color: var(--danger);
-    padding: 8px 10px;
-    border-radius: 8px;
-    cursor: pointer
-}
-
-.note-editor.note-frame, .note-editor.note-airframe {
-    border: 1px solid #e5e7eb !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,.04) !important;
-    background: #fff !important;
-}
-.note-editor.note-frame.focus, .note-editor.note-airframe.focus {
-    border-color: #89ba17 !important;
-    box-shadow: 0 0 0 .2rem rgba(137,186,23,.2) !important;
-}
-.note-editor .note-toolbar {
-    background: #f9fafb !important;
-    border-bottom: 1px solid #e5e7eb !important;
-    padding: 8px 10px !important;
-}
-.note-editor .note-btn-group .note-btn {
-    border-radius: 8px !important;
-    border: 1px solid transparent !important;
-    background: #fff !important;
-    color: #374151 !important;
-    padding: 6px 8px !important;
-}
-.note-editor .note-btn-group .note-btn:hover,
-.note-editor .note-btn-group .note-btn:focus {
-    background: rgba(137,186,23,.08) !important;
-    color: #6a9312 !important;
-    border-color: rgba(137,186,23,.35) !important;
-}
-.note-editor .note-btn-group .note-btn.active {
-    background: #89ba17 !important;
-    color: #fff !important;
-    border-color: #77a514 !important;
-}
-.note-editor .note-dropdown-menu, .note-editor .dropdown-menu {
-    border: 1px solid #e5e7eb !important;
-    border-radius: 10px !important;
-    box-shadow: 0 8px 20px rgba(0,0,0,.08) !important;
-}
-.note-editor .note-editing-area .note-editable {
-    padding: 12px !important;
-    min-height: 140px !important;
-    line-height: 1.6 !important;
-    font-size: 1rem !important;
-    color: #111827 !important;
-}
-.note-editor .note-editing-area .note-editable a {
-    color: #6a9312 !important;
-    text-decoration: underline !important;
-}
-.note-editor .note-placeholder {
-    color: #9ca3af !important;
-}
-.note-editor .note-statusbar {
-    background: #fff !important;
-    border-top: 1px solid #e5e7eb !important;
-}
-.note-editor .note-statusbar .note-resizebar {
-    height: 8px !important;
-}
-.note-editor .note-codable {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
-    background: #f8fafc !important;
-    color: #0f172a !important;
-    border: none !important;
-    border-top: 1px solid #e5e7eb !important;
-    border-bottom-left-radius: 12px !important;
-    border-bottom-right-radius: 12px !important;
-}

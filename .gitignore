@@ -20,3 +20,7 @@ ProjectsWebApp/wwwroot/uploads/
 .idea/
 *.sln.iml
 
+# Local secrets / runtime
+.env
+.claude/scheduled_tasks.lock
+

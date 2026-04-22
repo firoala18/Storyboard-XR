@@ -1,0 +1,88 @@
+name: storyboard-app
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: storyboard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-storyboard_db}
+      POSTGRES_USER: ${POSTGRES_USER:-storyboard_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-StoryboardSecure2024!}
+    volumes:
+      - storyboard_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-storyboard_user} -d ${POSTGRES_DB:-storyboard_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - storyboard-network
+
+  # ASP.NET Core Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: storyboard-web
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_PATHBASE=
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${POSTGRES_DB:-storyboard_db};Username=${POSTGRES_USER:-storyboard_user};Password=${POSTGRES_PASSWORD:-StoryboardSecure2024!}
+      - SUPERADMIN_EMAIL=${SUPERADMIN_EMAIL:-}
+      - SUPERADMIN_PASSWORD=${SUPERADMIN_PASSWORD:-}
+      - DataProtection__KeysPath=/var/aspnet-dpkeys/storyboard
+    ports:
+      - "127.0.0.1:5052:8080"
+    volumes:
+      - storyboard_uploads:/app/wwwroot/uploads
+      - storyboard_uploads_images:/app/wwwroot/images
+      - storyboard_uploads_videos:/app/wwwroot/videos
+      - storyboard_dpkeys:/var/aspnet-dpkeys/storyboard
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - storyboard-network
+
+  # Database Migrator (runs once)
+  migrator:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: storyboard-migrator
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /src
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${POSTGRES_DB:-storyboard_db};Username=${POSTGRES_USER:-storyboard_user};Password=${POSTGRES_PASSWORD:-StoryboardSecure2024!}
+    volumes:
+      - .:/src
+    command: ["bash", "scripts/migrate.sh"]
+    networks:
+      - storyboard-network
+    profiles:
+      - migrate
+
+networks:
+  storyboard-network:
+    name: storyboard-network
+    driver: bridge
+
+volumes:
+  storyboard_pgdata:
+  storyboard_uploads:
+  storyboard_uploads_images:
+  storyboard_uploads_videos:
+  storyboard_dpkeys:

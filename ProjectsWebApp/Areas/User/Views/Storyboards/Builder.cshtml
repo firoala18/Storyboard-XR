@@ -1,0 +1,38 @@
+@model ProjectsWebApp.Models.Storyboard
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Storyboard Builder" : Model.Title;
+    var initialStep = ViewBag.InitialStep as int? ?? 1;
+    ViewBag.FullWidth = true;
+}
+
+@await Html.PartialAsync("~/Areas/User/Views/Storyboards/_BuilderTimeline.cshtml", Model)
+
+<main class="builder-main" data-storyboard-id="@Model.Id"
+      data-storyboard-rowversion="@(Model.RowVersion is null ? "" : Convert.ToBase64String(Model.RowVersion))"
+      data-initial-step="@initialStep">
+
+    <section class="builder-step-panel" data-step="1" hidden>
+        @await Html.PartialAsync("~/Areas/User/Views/Storyboards/_BuilderStep1Infos.cshtml", Model)
+    </section>
+
+    <section class="builder-step-panel" data-step="2" hidden>
+        @await Html.PartialAsync("~/Areas/User/Views/Storyboards/_BuilderStep2Scenes.cshtml", Model)
+    </section>
+
+    <section class="builder-step-panel" data-step="3" hidden>
+        @await Html.PartialAsync("~/Areas/User/Views/Storyboards/_BuilderStep3Pdf.cshtml", Model)
+    </section>
+
+    <div class="builder-phone-notice" hidden>
+        <p>Der Storyboard Builder ist für größere Bildschirme gebaut. Bitte nutze ein Tablet oder einen Laptop.</p>
+    </div>
+</main>
+
+@Html.AntiForgeryToken()
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js" referrerpolicy="origin"></script>
+    <script src="~/js/ui-select.js" asp-append-version="true"></script>
+    <script src="~/js/builder.js" asp-append-version="true"></script>
+    <script src="~/js/builder-step2.js" asp-append-version="true"></script>
+}

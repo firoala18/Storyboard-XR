@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectsWebApp.DataAccsess.Data;
 using ProjectsWebApp.Models;
+using ProjectsWebApp.Models.Dtos;
 using ProjectsWebApp.Utility;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -18,8 +19,6 @@ namespace ProjectsWebApp.Areas.User.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly UserManager<IdentityUser> _userManager;
-
-        private const long MaxImageSizeBytes = 2 * 1024 * 1024;
 
         public StoryboardsController(
             ApplicationDbContext context,
@@ -73,138 +72,166 @@ namespace ProjectsWebApp.Areas.User.Controllers
             return View(items);
         }
 
-        // GET: /User/Storyboards/Details/5?sceneId=12[&t=EDIT_TOKEN]
-        // Open edit view. Allow owner/super, or anonymous with a valid EDIT token.
+        // GET: /User/Storyboards/Details/5  — redirect shim to the Builder.
         [AllowAnonymous]
-        public async Task<IActionResult> Details(int id, int? sceneId, string? t)
+        public IActionResult Details(int id, int? sceneId, string? t)
         {
-            var sb = await _context.Storyboards
-                .Include(s => s.Scenes)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Id == id);
-
-            if (sb == null) return NotFound();
-
-            var isOwner = (sb.OwnerId != null && sb.OwnerId == CurrentUserId)
-                          || (!string.IsNullOrWhiteSpace(sb.OwnerTokenHash) && GetOrCreateOwnerTokenHash(HttpContext) == sb.OwnerTokenHash);
-            var hasAnyToken = !string.IsNullOrWhiteSpace(t) && (t == sb.AccessTokenView || t == sb.AccessTokenEdit);
-            var hasEditToken = !string.IsNullOrWhiteSpace(t) && t == sb.AccessTokenEdit;
-
-            if (!isOwner && !IsSuper && !hasAnyToken)
-                return Forbid();
-
-            int? activeSceneId = sceneId;
-            if (activeSceneId.HasValue && !sb.Scenes.Any(sc => sc.Id == activeSceneId.Value))
-                activeSceneId = null;
-
-            if (!activeSceneId.HasValue)
-                activeSceneId = sb.Scenes
-                    .OrderBy(sc => sc.Number)
-                    .ThenBy(sc => sc.Id)
-                    .Select(sc => (int?)sc.Id)
-                    .FirstOrDefault();
-
-            ViewBag.ActiveSceneId = activeSceneId;
-            ViewBag.Token = t; // pass through so client JS can call APIs with ?token=
-            ViewBag.IsGuestEditor = !isOwner && !IsSuper && hasEditToken;
-
-            var isStaff = User.IsInRole("Admin") || IsSuper;
-            ViewBag.IsStaff = isStaff;
-
-            // read-only in the Details view if user cannot edit (no owner, no super, no edit token)
-            var canEdit = isOwner || IsSuper || hasEditToken;
-            ViewData["ReadOnly"] = !canEdit;
-
-            // AI-Bildgenerierung NUR für authentifizierte Nutzer,
-            // die entweder bearbeiten dürfen oder Staff (Admin/Super) sind.
-            var isAuthenticated = User?.Identity?.IsAuthenticated ?? false;
-            ViewBag.CanGenerateAi = isAuthenticated && (canEdit || isStaff);
-
-            return View(sb);
+            var url = Url.Action(nameof(Builder), new { id, step = 2, t });
+            return RedirectPermanent(url ?? $"/Storyboards/Builder/{id}?step=2");
         }
 
-        // GET: /User/Storyboards/Create  (signed-in flow)
-        public IActionResult Create() => View();
-
-        // POST: /User/Storyboards/Create  (signed-in flow)
+        // POST: /User/Storyboards/NewDraft
+        // Creates a minimal placeholder storyboard for the inline Builder flow.
+        // The Builder page then auto-saves title, description, cover, etc. via PATCH.
+        [AllowAnonymous]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(
-            [FromForm] string title,
-            [FromForm] IFormFile image,
-            [FromForm] string? zielgruppe,
-            [FromForm] string? beschreibung,
-            [FromForm] string? lernziel,
-            [FromForm] string? farbpalette,
-            [FromForm] TaxonomieStufe? taxonomie,
-            [FromForm] LicenseType? license,
-            [FromForm] string? authors,
-            [FromForm] string? licenseExtras
-        )
+        public async Task<IActionResult> NewDraft()
         {
-            if (string.IsNullOrWhiteSpace(title))
-                ModelState.AddModelError("title", "Title is required");
-            if (image == null || image.Length == 0)
-                ModelState.AddModelError("image", "Cover-Bild ist erforderlich");
-            if (image != null && image.Length > MaxImageSizeBytes)
-                ModelState.AddModelError("image", "Bild darf maximal 2 MB groß sein.");
-            if (!ModelState.IsValid) return View();
+            var userId = CurrentUserId;
+            var ownerTokenHash = string.IsNullOrWhiteSpace(userId)
+                ? GetOrCreateOwnerTokenHash(HttpContext)
+                : null;
 
-            // --- save image ---
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var uploadsDir = Path.Combine(webRoot, "uploads");
-            Directory.CreateDirectory(uploadsDir);
-
-            var ext = Path.GetExtension(image.FileName).ToLowerInvariant();
-            var allowed = new[] { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
-            if (!allowed.Contains(ext))
-            {
-                ModelState.AddModelError("image", "Only PNG/JPG/WebP/GIF are allowed");
-                return View();
-            }
-
-            var fileName = $"{Guid.NewGuid():N}{ext}";
-            await using (var fs = new FileStream(Path.Combine(uploadsDir, fileName), FileMode.Create))
-                await image.CopyToAsync(fs);
-
-            // --- link-based access fields (REQUIRED) ---
-            var publicId = await NextPublicIdAsync();     // short slug for /s/{slug}
-            var editKeyPlain = UrlSafeRandom(24);         // show this to the user once if you want
+            var publicId = await NextPublicIdAsync();
+            var editKeyPlain = UrlSafeRandom(24);
             var editKeyHash = Sha256Hex(editKeyPlain);
 
-            // if user is anonymous, bind to cookie token hash; otherwise keep OwnerId
-            var ownerTokenHash = string.IsNullOrEmpty(CurrentUserId) ? GetOrCreateOwnerTokenHash(HttpContext) : null;
-
-            // --- create board ---
             var sb = new Storyboard
             {
-                Title = title.Trim(),
-                Zielgruppe = (zielgruppe ?? "").Trim(),
-                Beschreibung = (beschreibung ?? "").Trim(),
-                Lernziel = (lernziel ?? "").Trim(),
-                Farbpalette = NormalizePalette(farbpalette),
-                Taxonomie = taxonomie,
-                License = license,
-                Authors = NormalizeAuthors(authors),
-                LicenseExtras = string.IsNullOrWhiteSpace(licenseExtras) ? null : licenseExtras.Trim(),
-                OwnerId = CurrentUserId,          // null when not logged in
-                OwnerTokenHash = ownerTokenHash,       // set for anonymous owners
+                Title = "Unbenanntes Storyboard",
+                OwnerId = userId,
+                OwnerTokenHash = ownerTokenHash,
                 PublicId = publicId,
                 EditKeyHash = editKeyHash,
                 CreatedAt = DateTime.UtcNow,
                 LastSeenAt = DateTime.UtcNow,
-                // Save cover path to both new and legacy fields for backward compatibility
-                CoverImagePath = "/uploads/" + fileName,
-                ImagePath = "/uploads/" + fileName // legacy
+                CoverImagePath = DefaultCoverImagePath,
+                ImagePath = DefaultCoverImagePath,
             };
 
             _context.Storyboards.Add(sb);
             await _context.SaveChangesAsync();
 
-            // optional: surface the one-time edit key to the user
-            TempData["Info"] = $"Öffentlicher Link: /s/{publicId}  •  Edit-Key: {editKeyPlain}";
+            return Json(new { id = sb.Id });
+        }
 
-            return RedirectToAction(nameof(Details), new { id = sb.Id, sceneId = (int?)null });
+        // GET: /User/Storyboards/Builder/5[?step=1|2|3][&t=EDIT_TOKEN]
+        // The unified edit surface: timeline header + three step panels (Infos / Scenes / PDF).
+        // Allow owner/super, or anonymous with a valid edit token / edit cookie.
+        [AllowAnonymous]
+        public async Task<IActionResult> Builder(int id, int step = 1, string? t = null)
+        {
+            var sb = await _context.Storyboards
+                .Include(s => s.Scenes.OrderBy(x => x.Number))
+                    .ThenInclude(s => s.Markers.OrderBy(m => m.Number))
+                .FirstOrDefaultAsync(s => s.Id == id);
+            if (sb == null) return NotFound();
+
+            var hasEditToken = !string.IsNullOrWhiteSpace(t) && t == sb.AccessTokenEdit;
+            if (!hasEditToken && !CanWrite(sb)) return Forbid();
+
+            sb.LastSeenAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            ViewBag.Token = t;
+            ViewBag.InitialStep = step is >= 1 and <= 3 ? step : 1;
+            return View("Builder", sb);
+        }
+
+        // GET /Storyboards/{id}/ScenesJson
+        // Fresh snapshot of a storyboard's scenes + markers. Used by Step 3 to
+        // rebuild its preview after edits made in Step 2 without a page reload.
+        [AllowAnonymous]
+        [HttpGet("/Storyboards/{id:int}/ScenesJson")]
+        public async Task<IActionResult> ScenesJson(int id)
+        {
+            var sb = await _context.Storyboards
+                .Include(s => s.Scenes)
+                    .ThenInclude(sc => sc.Markers)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == id);
+            if (sb == null) return NotFound();
+            if (!CanWrite(sb)) return Forbid();
+
+            return Json(new
+            {
+                id = sb.Id,
+                title = sb.Title,
+                scenes = sb.Scenes.OrderBy(s => s.Number).ThenBy(s => s.Id).Select(s => new
+                {
+                    id = s.Id,
+                    number = s.Number,
+                    name = s.Name,
+                    imagePath = string.IsNullOrWhiteSpace(s.ImagePath) ? null : Url.Content("~" + s.ImagePath),
+                    markers = s.Markers.OrderBy(m => m.Number).Select(m => new
+                    {
+                        id = m.Id,
+                        number = m.Number,
+                        x = m.X,
+                        y = m.Y,
+                        colorHex = m.ColorHex,
+                        description = m.Description
+                    })
+                })
+            });
+        }
+
+        private const long MaxCoverImageBytes = 30L * 1024 * 1024; // 30 MB
+        private static readonly string[] AllowedCoverExtensions = { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
+        private const string DefaultCoverImagePath = "/images/no-image-icon.png";
+
+        // POST: /User/Storyboards/UploadCover
+        // Stores a new cover image and updates Storyboard.CoverImagePath.
+        [AllowAnonymous]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RequestSizeLimit(40_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 40_000_000)]
+        public async Task<IActionResult> UploadCover(int id, IFormFile image)
+        {
+            var sb = await _context.Storyboards.FirstOrDefaultAsync(s => s.Id == id);
+            if (sb == null) return NotFound();
+            if (!CanWrite(sb)) return Forbid();
+            if (image == null || image.Length == 0) return BadRequest(new { message = "Keine Datei empfangen." });
+            if (image.Length > MaxCoverImageBytes) return BadRequest(new { message = "Max 30 MB." });
+
+            var relPath = await SaveCoverImageAsync(image, sb);
+            if (relPath == null) return BadRequest(new { message = "Nur PNG/JPG/WebP/GIF erlaubt." });
+
+            sb.CoverImagePath = relPath;
+            sb.ImagePath = relPath; // legacy sync
+            sb.LastSeenAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Json(new { coverImagePath = Url.Content("~" + relPath) });
+        }
+
+        private async Task<string?> SaveCoverImageAsync(IFormFile image, Storyboard sb)
+        {
+            var ext = Path.GetExtension(image.FileName).ToLowerInvariant();
+            if (!AllowedCoverExtensions.Contains(ext)) return null;
+
+            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+            var uploadsDir = Path.Combine(webRoot, "uploads");
+            Directory.CreateDirectory(uploadsDir);
+
+            var fileName = $"{Guid.NewGuid():N}{ext}";
+            var dest = Path.Combine(uploadsDir, fileName);
+            await using (var fs = new FileStream(dest, FileMode.Create))
+                await image.CopyToAsync(fs);
+
+            var existing = !string.IsNullOrWhiteSpace(sb.CoverImagePath) ? sb.CoverImagePath : sb.ImagePath;
+            if (!string.IsNullOrWhiteSpace(existing) && existing.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+            {
+                var oldPath = Path.Combine(webRoot, existing.TrimStart('/'));
+                if (System.IO.File.Exists(oldPath))
+                {
+                    try { System.IO.File.Delete(oldPath); } catch { /* best-effort */ }
+                }
+            }
+
+            return "/uploads/" + fileName;
         }
 
         // ---------- helpers ----------
@@ -248,6 +275,33 @@ namespace ProjectsWebApp.Areas.User.Controllers
             }
             return Sha256Hex(tok);
         }
+
+        // ---- Public editing auth helpers (mirror ScenesController lines 43–62) ----
+        private const string AnonCookie = "sb_uid";
+        private static string EditCookieName(string slug) => $"sbedit_{slug}";
+
+        private bool IsStaff => User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+
+        private bool HasEditCookie(Storyboard sb)
+        {
+            if (string.IsNullOrWhiteSpace(sb.PublicId)) return false;
+            if (!Request.Cookies.TryGetValue(EditCookieName(sb.PublicId), out var k) || string.IsNullOrWhiteSpace(k))
+                return false;
+            return string.Equals(Sha256Hex(k), sb.EditKeyHash, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsOwnerByToken(Storyboard sb)
+        {
+            if (string.IsNullOrWhiteSpace(sb.OwnerTokenHash)) return false;
+            if (!Request.Cookies.TryGetValue(AnonCookie, out var token) || string.IsNullOrWhiteSpace(token))
+                return false;
+            return string.Equals(Sha256Hex(token), sb.OwnerTokenHash, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsOwnerByLogin(Storyboard sb)
+            => !string.IsNullOrWhiteSpace(sb.OwnerId) && string.Equals(sb.OwnerId, CurrentUserId, StringComparison.Ordinal);
+
+        private bool CanWrite(Storyboard sb) => IsStaff || IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasEditCookie(sb);
 
         // Normalize a free-form list of authors into a comma-separated single string
         public static string? NormalizeAuthors(string? raw)
@@ -309,125 +363,12 @@ namespace ProjectsWebApp.Areas.User.Controllers
             return RedirectToAction("Create", "PublicStoryboards", new { area = "User" });
         }
 
-        // GET: /User/Storyboards/Edit/5[?t=EDIT_TOKEN]
-        // Allow owner/super, or anonymous with valid EDIT token.
+        // GET: /User/Storyboards/Edit/5  — redirect shim to the Builder.
         [AllowAnonymous]
-        public async Task<IActionResult> Edit(int id, string? t)
+        public IActionResult Edit(int id, string? t)
         {
-            var sb = await _context.Storyboards
-                .Include(s => s.Scenes)
-                .FirstOrDefaultAsync(s => s.Id == id);
-
-            if (sb == null) return NotFound();
-
-            var isOwner = sb.OwnerId != null && sb.OwnerId == CurrentUserId;
-            var hasEditToken = !string.IsNullOrWhiteSpace(t) && t == sb.AccessTokenEdit;
-            if (!isOwner && !IsSuper && !hasEditToken) return Forbid();
-
-            // ⬇️ add this block
-            var firstScene = sb.Scenes
-                .OrderBy(sc => sc.Number)
-                .ThenBy(sc => sc.Id)
-                .FirstOrDefault();
-            ViewBag.FirstSceneId = firstScene?.Id;
-            ViewBag.FirstSceneNumber = firstScene?.Number ?? 1;
-            ViewBag.FirstSceneName = firstScene?.Name;
-
-            var cover = !string.IsNullOrWhiteSpace(sb.ImagePath)
-                ? sb.ImagePath
-                : sb.Scenes?
-                    .OrderBy(sc => sc.Number)
-                    .ThenBy(sc => sc.Id)
-                    .Select(sc => sc.ImagePath)
-                    .FirstOrDefault();
-
-            ViewBag.CoverPath = cover;
-            ViewBag.Token = t;
-            ViewBag.IsGuestEditor = !isOwner && !IsSuper && hasEditToken;
-
-            return View(sb);
-        }
-
-
-        // POST: /User/Storyboards/Edit/5[?t=EDIT_TOKEN]
-        [AllowAnonymous]
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(
-     int id,
-     [Bind("Id,Title,Zielgruppe,Beschreibung,Lernziel,Farbpalette,Taxonomie,License,Authors,LicenseExtras")] Storyboard input,
-     IFormFile? image,
-     string? t)
-        {
-            var sb = await _context.Storyboards
-                .Include(s => s.Scenes)  // ⬅️ ensure scenes are loaded
-                .FirstOrDefaultAsync(s => s.Id == id);
-            if (sb == null) return NotFound();
-
-            var isOwner = sb.OwnerId != null && sb.OwnerId == CurrentUserId;
-            var hasEditToken = !string.IsNullOrWhiteSpace(t) && t == sb.AccessTokenEdit;
-            if (!isOwner && !IsSuper && !hasEditToken) return Forbid();
-
-            if (string.IsNullOrWhiteSpace(input.Title))
-            {
-                ModelState.AddModelError("Title", "Title is required");
-                return View(sb);
-            }
-
-            // ----- update storyboard fields -----
-            sb.Title = input.Title.Trim();
-            sb.Zielgruppe = (input.Zielgruppe ?? "").Trim();
-            sb.Beschreibung = (input.Beschreibung ?? "").Trim();
-            sb.Lernziel = (input.Lernziel ?? "").Trim();
-            sb.Farbpalette = NormalizePalette(input.Farbpalette);
-            sb.Taxonomie = input.Taxonomie;
-            sb.License = input.License;
-            sb.Authors = NormalizeAuthors(input.Authors);
-            sb.LicenseExtras = string.IsNullOrWhiteSpace(input.LicenseExtras) ? null : input.LicenseExtras.Trim();
-
-            // ----- optional: replace COVER image (not scene) -----
-            if (image != null && image.Length > 0)
-            {
-                if (image.Length > MaxImageSizeBytes)
-                {
-                    ModelState.AddModelError("image", "Bild darf maximal 2 MB groß sein.");
-                    return View(sb);
-                }
-
-                var ext = Path.GetExtension(image.FileName).ToLowerInvariant();
-                var allowed = new[] { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
-                if (!allowed.Contains(ext))
-                {
-                    ModelState.AddModelError("image", "Only PNG/JPG/WebP/GIF are allowed");
-                    return View(sb);
-                }
-
-                var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-                var uploadsDir = Path.Combine(webRoot, "uploads");
-                Directory.CreateDirectory(uploadsDir);
-
-                var fileName = $"{Guid.NewGuid():N}{ext}";
-                var dest = Path.Combine(uploadsDir, fileName);
-                await using (var fs = new FileStream(dest, FileMode.Create))
-                    await image.CopyToAsync(fs);
-
-                // delete old cover file if present
-                var existingCover = !string.IsNullOrWhiteSpace(sb.CoverImagePath) ? sb.CoverImagePath : sb.ImagePath;
-                if (!string.IsNullOrWhiteSpace(existingCover))
-                {
-                    var oldPath = Path.Combine(webRoot, existingCover.TrimStart('/'));
-                    if (System.IO.File.Exists(oldPath)) System.IO.File.Delete(oldPath);
-                }
-
-                var newPath = "/uploads/" + fileName;
-                sb.CoverImagePath = newPath;
-                sb.ImagePath = newPath; // legacy sync
-            }
-
-            await _context.SaveChangesAsync();
-
-            // keep token if present
-            return RedirectToAction(nameof(Details), new { id = sb.Id, t, sceneId = (int?)null });
+            var url = Url.Action(nameof(Builder), new { id, step = 1, t });
+            return RedirectPermanent(url ?? $"/Storyboards/Builder/{id}?step=1");
         }
 
         // POST: /User/Storyboards/Delete/5   (only owner/super)
@@ -456,9 +397,9 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 }
             }
 
-            // remove cover file (new field preferred) and legacy
+            // remove cover file (new field preferred) and legacy — only user uploads, not shared defaults
             var coverPath = !string.IsNullOrWhiteSpace(sb.CoverImagePath) ? sb.CoverImagePath : sb.ImagePath;
-            if (!string.IsNullOrWhiteSpace(coverPath))
+            if (!string.IsNullOrWhiteSpace(coverPath) && coverPath.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
             {
                 var cover = Path.Combine(webRoot, coverPath.TrimStart('/'));
                 if (System.IO.File.Exists(cover)) System.IO.File.Delete(cover);
@@ -477,6 +418,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
         {
             var sb = await _context.Storyboards
                 .Include(s => s.Scenes)
+                    .ThenInclude(sc => sc.Markers)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -541,6 +483,55 @@ namespace ProjectsWebApp.Areas.User.Controllers
 
             ViewBag.Token = t;
             return View(sb);
+        }
+
+        // PATCH /Storyboards/{id}
+        // Partial update for inline auto-save. Each property is optional;
+        // null means "not sent; don't change", non-null means "update to this value".
+        [AllowAnonymous]
+        [HttpPatch("/Storyboards/{id:int}")]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> Patch(int id, [FromBody] StoryboardPatchDto dto)
+        {
+            if (dto == null) return BadRequest();
+
+            var sb = await _context.Storyboards.FirstOrDefaultAsync(s => s.Id == id);
+            if (sb == null) return NotFound();
+            if (!CanWrite(sb)) return Forbid();
+
+            if (dto.RowVersion != null && sb.RowVersion != null &&
+                !dto.RowVersion.SequenceEqual(sb.RowVersion))
+            {
+                return Conflict(new { reason = "stale", rowVersion = sb.RowVersion });
+            }
+
+            if (dto.Title is not null)
+            {
+                var t = dto.Title.Trim();
+                if (string.IsNullOrWhiteSpace(t)) return BadRequest(new { field = "title", message = "Titel darf nicht leer sein." });
+                if (t.Length > 200) return BadRequest(new { field = "title", message = "Max. 200 Zeichen." });
+                sb.Title = t;
+            }
+            if (dto.Zielgruppe is not null) sb.Zielgruppe = dto.Zielgruppe;
+            if (dto.Beschreibung is not null) sb.Beschreibung = dto.Beschreibung;
+            if (dto.Lernziel is not null) sb.Lernziel = dto.Lernziel;
+            if (dto.Farbpalette is not null) sb.Farbpalette = dto.Farbpalette;
+            if (dto.Taxonomie is not null) sb.Taxonomie = dto.Taxonomie.Value;
+            if (dto.License is not null) sb.License = dto.License.Value;
+            if (dto.LicenseExtras is not null)
+            {
+                if (dto.LicenseExtras.Length > 2000) return BadRequest(new { field = "licenseExtras", message = "Max. 2000 Zeichen." });
+                sb.LicenseExtras = dto.LicenseExtras;
+            }
+            if (dto.Authors is not null) sb.Authors = dto.Authors;
+            if (dto.CoverImagePath is not null) sb.CoverImagePath = dto.CoverImagePath;
+
+            sb.LastSeenAt = DateTime.UtcNow;
+
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return Conflict(new { reason = "stale" }); }
+
+            return Ok(new { ok = true, lastSavedAt = DateTime.UtcNow, rowVersion = sb.RowVersion });
         }
     }
 }

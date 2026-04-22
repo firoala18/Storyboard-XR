@@ -1,0 +1,214 @@
+@model ProjectsWebApp.Models.Storyboard
+@using ProjectsWebApp.Models
+@{
+    var coverRaw = !string.IsNullOrWhiteSpace(Model.CoverImagePath) ? Model.CoverImagePath : Model.ImagePath;
+    var cover = string.IsNullOrWhiteSpace(coverRaw) ? null : Url.Content("~" + coverRaw);
+    var colors = string.IsNullOrWhiteSpace(Model.Farbpalette)
+        ? new List<string>()
+        : Model.Farbpalette.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    var authors = string.IsNullOrWhiteSpace(Model.Authors)
+        ? new List<string>()
+        : Model.Authors.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+}
+
+<div class="step1">
+    <section class="step1-hero">
+        <div class="step1-cover" data-field="coverImagePath">
+            @if (cover is not null)
+            {
+                <img src="@cover" alt="Cover" />
+            }
+            else
+            {
+                <div class="step1-cover-empty">Cover hinzufügen</div>
+            }
+            <button type="button" class="step1-cover-btn" data-action="upload-cover">↑ ersetzen</button>
+            <input type="file" class="step1-cover-input" accept="image/*" hidden />
+        </div>
+
+        <div class="step1-titles">
+            <div class="field-label">✏️ Titel · klicken zum Bearbeiten</div>
+            <div class="step1-title"
+                 data-builder-edit
+                 data-builder-entity="storyboard"
+                 data-builder-field="title"
+                 data-placeholder="Titel eingeben …">@Model.Title</div>
+
+            <div class="field-label" style="margin-top:14px">✏️ Beschreibung</div>
+            <div class="step1-description"
+                 data-builder-edit
+                 data-builder-entity="storyboard"
+                 data-builder-field="beschreibung"
+                 data-builder-multiline="true"
+                 data-placeholder="Beschreibung hinzufügen …">@Model.Beschreibung</div>
+        </div>
+    </section>
+
+    <section class="step1-stack">
+        <div class="step1-card">
+            <div class="field-label">🎯 Zielgruppe</div>
+            <div class="step1-input"
+                 data-builder-edit
+                 data-builder-entity="storyboard"
+                 data-builder-field="zielgruppe"
+                 data-builder-multiline="true"
+                 data-placeholder="z.B. Studierende im 3. Semester …">@Model.Zielgruppe</div>
+        </div>
+
+        <div class="step1-card">
+            <div class="field-label">📊 Taxonomie</div>
+            <select class="step1-select" data-ui-select data-field="taxonomie">
+                <option value="" selected="@(Model.Taxonomie == null)">— bitte wählen —</option>
+                @foreach (var t in Enum.GetValues<TaxonomieStufe>())
+                {
+                    <option value="@((int)t)" selected="@(Model.Taxonomie.HasValue && (int)t == (int)Model.Taxonomie.Value)">@t</option>
+                }
+            </select>
+        </div>
+
+        <div class="step1-card">
+            <div class="field-label">🎓 Lernziel</div>
+            <div class="step1-input"
+                 data-builder-edit
+                 data-builder-entity="storyboard"
+                 data-builder-field="lernziel"
+                 data-builder-multiline="true"
+                 data-placeholder="Was sollen Lernende danach können? …">@Model.Lernziel</div>
+        </div>
+
+        <div class="step1-card">
+            <div class="field-label">🎨 Farbpalette</div>
+            <div class="step1-palette" data-field="farbpalette">
+                @foreach (var c in colors)
+                {
+                    <span class="palette-chip" data-color="@c" style="background:@c" title="@c"></span>
+                }
+                <label class="palette-add" title="Farbe hinzufügen">
+                    +
+                    <input type="color" class="palette-picker" />
+                </label>
+            </div>
+        </div>
+
+        <div class="step1-card">
+            <div class="field-label">📜 Lizenz</div>
+            <select class="step1-select" data-ui-select data-field="license">
+                <option value="" selected="@(Model.License == null)">— bitte wählen —</option>
+                @foreach (var l in Enum.GetValues<LicenseType>())
+                {
+                    <option value="@((int)l)" selected="@(Model.License.HasValue && (int)l == (int)Model.License.Value)">@l</option>
+                }
+            </select>
+            <textarea class="step1-licenseextras"
+                      data-builder-edit
+                      data-builder-entity="storyboard"
+                      data-builder-field="licenseExtras"
+                      data-builder-multiline="true"
+                      placeholder="Zusätze zur Lizenz (optional)">@Model.LicenseExtras</textarea>
+        </div>
+
+        <div class="step1-card">
+            <div class="field-label">✍️ Autor:innen</div>
+            <div class="step1-authors" data-field="authors">
+                @foreach (var a in authors)
+                {
+                    <span class="author-chip">@a <button type="button" class="author-chip-x">×</button></span>
+                }
+                <input type="text" class="author-input" placeholder="Name + Enter" />
+            </div>
+        </div>
+    </section>
+
+    <div class="step1-footer">
+        <button type="button" class="btn-primary-green" data-goto-step="2">Weiter: Szenen &amp; Marker →</button>
+    </div>
+</div>
+
+<script>
+(function(){
+    const sbId = @Model.Id;
+
+    const coverWrap = document.querySelector('.step1-cover');
+    const coverInput = coverWrap?.querySelector('.step1-cover-input');
+    const coverBtn = coverWrap?.querySelector('[data-action="upload-cover"]');
+    coverBtn?.addEventListener('click', () => coverInput.click());
+    coverInput?.addEventListener('change', async () => {
+        const file = coverInput.files?.[0]; if (!file) return;
+        const fd = new FormData();
+        fd.append('id', String(sbId));
+        fd.append('image', file);
+        fd.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+        window.Builder?.setChip('saving', 'Lade Cover hoch…');
+        const res = await fetch('@Url.Action("UploadCover", "Storyboards", new { area = "User" })', { method:'POST', body: fd });
+        if (res.ok) {
+            const data = await res.json();
+            const img = coverWrap.querySelector('img') ?? document.createElement('img');
+            img.src = data.coverImagePath; img.alt = 'Cover';
+            coverWrap.querySelector('.step1-cover-empty')?.remove();
+            if (!coverWrap.contains(img)) coverWrap.prepend(img);
+            window.Builder?.setChip('saved', 'Gespeichert vor 1 Sek.');
+        } else {
+            const msg = await res.text().catch(() => 'Upload fehlgeschlagen.');
+            window.Builder?.setChip('error', '⚠ ' + (msg || 'Upload fehlgeschlagen'));
+        }
+        coverInput.value = '';
+    });
+
+    document.querySelectorAll('.step1-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const field = sel.dataset.field;
+            const raw = sel.value;
+            const value = raw === '' ? null : Number(raw);
+            window.Builder.patchField('storyboard', sbId, field, value, { immediate: true });
+        });
+    });
+
+    const palette = document.querySelector('.step1-palette');
+    const picker  = palette?.querySelector('.palette-picker');
+    function savePalette() {
+        const vals = Array.from(palette.querySelectorAll('.palette-chip')).map(c => c.dataset.color).join(',');
+        window.Builder.patchField('storyboard', sbId, 'farbpalette', vals, { immediate: true });
+    }
+    // The <label class="palette-add"> contains the <input type="color">, so native
+    // click on the label already opens the picker anchored to the button's position.
+    picker?.addEventListener('change', () => {
+        const chip = document.createElement('span');
+        chip.className = 'palette-chip'; chip.dataset.color = picker.value;
+        chip.style.background = picker.value; chip.title = picker.value;
+        palette.insertBefore(chip, palette.querySelector('.palette-add'));
+        savePalette();
+    });
+    palette?.addEventListener('contextmenu', ev => {
+        const chip = ev.target.closest('.palette-chip');
+        if (!chip) return;
+        ev.preventDefault();
+        chip.remove(); savePalette();
+    });
+
+    const authorsWrap = document.querySelector('.step1-authors');
+    const authorInput = authorsWrap?.querySelector('.author-input');
+    function saveAuthors() {
+        const vals = Array.from(authorsWrap.querySelectorAll('.author-chip'))
+                          .map(c => c.firstChild.textContent.trim()).filter(Boolean).join(', ');
+        window.Builder.patchField('storyboard', sbId, 'authors', vals, { immediate: true });
+    }
+    authorInput?.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault();
+        const v = authorInput.value.trim(); if (!v) return;
+        const chip = document.createElement('span');
+        chip.className = 'author-chip';
+        chip.innerHTML = `${v} <button type="button" class="author-chip-x">×</button>`;
+        authorsWrap.insertBefore(chip, authorInput);
+        authorInput.value = '';
+        saveAuthors();
+    });
+    authorsWrap?.addEventListener('click', ev => {
+        if (!ev.target.classList.contains('author-chip-x')) return;
+        ev.target.closest('.author-chip').remove();
+        saveAuthors();
+    });
+
+    document.querySelector('[data-goto-step="2"]')?.addEventListener('click', () => window.Builder.gotoStep(2));
+})();
+</script>

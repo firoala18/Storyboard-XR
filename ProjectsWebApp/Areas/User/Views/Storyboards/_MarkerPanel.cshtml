@@ -1,0 +1,321 @@
+@model ProjectsWebApp.Models.Storyboard
+@using ProjectsWebApp.Models
+@{
+    // Cap marker Taxonomie at the storyboard's Taxonomie. If the board has
+    // no Taxonomie set, allow all levels.
+    var maxMarkerTaxo = Model.Taxonomie.HasValue ? (int)Model.Taxonomie.Value : 5;
+}
+
+<div class="marker-panel-empty" data-role="marker-panel-empty">
+    Kein Marker ausgewählt.
+    <div style="margin-top:6px; font-size:11px; color:#cbd5e1;">Klicke ins Bild, um einen Marker zu setzen.</div>
+</div>
+
+<div class="marker-panel" data-role="marker-panel" hidden>
+    <header class="marker-panel-head">
+        <button type="button" class="marker-chip-nav" data-action="marker-prev" title="Vorheriger Marker" aria-label="Vorheriger Marker">‹</button>
+        <div class="marker-chip-strip" data-role="marker-chip-strip" role="tablist" aria-label="Marker-Navigation"></div>
+        <button type="button" class="marker-chip-nav" data-action="marker-next" title="Nächster Marker" aria-label="Nächster Marker">›</button>
+        <button type="button" class="marker-chip-delete" data-action="marker-delete" title="Marker löschen" aria-label="Marker löschen">🗑</button>
+    </header>
+
+    <div class="marker-panel-body">
+        <div class="field-label">Farbe</div>
+        <div class="marker-color-picker" data-role="color-picker">
+            @foreach (var c in new[] { "#ef4444", "#3b82f6", "#f59e0b", "#89ba17", "#8b5cf6", "#0ea5e9", "#64748b" })
+            {
+                <button type="button" class="color-swatch" style="background:@c" data-color="@c"></button>
+            }
+            <label class="color-swatch color-swatch-custom" title="Eigene Farbe wählen" data-role="color-swatch-custom">
+                <span class="color-swatch-plus" aria-hidden="true">+</span>
+                <input type="color" data-role="color-free" />
+            </label>
+        </div>
+
+        <details class="marker-advanced" open>
+            <summary>
+                <span class="marker-advanced-caret" aria-hidden="true">▸</span>
+                <span class="marker-advanced-label">🎓 Didaktik</span>
+            </summary>
+            <div class="marker-advanced-body">
+                <div class="marker-advanced-field">
+                    <div class="field-label">📊 Taxonomie <span class="marker-taxo-hint" data-role="taxo-hint">
+                        @if (Model.Taxonomie.HasValue)
+                        {
+                            <text>· max. @Model.Taxonomie</text>
+                        }
+                    </span></div>
+                    <select class="marker-taxo marker-input" data-ui-select data-field="taxonomie" data-max-taxo="@maxMarkerTaxo">
+                        <option value="">— bitte wählen —</option>
+                        @foreach (var t in Enum.GetValues<TaxonomieStufe>())
+                        {
+                            if ((int)t <= maxMarkerTaxo)
+                            {
+                                <option value="@((int)t)">@((int)t + 1). @t</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="marker-advanced-field">
+                    <div class="field-label">🎯 Ziel</div>
+                    <textarea class="marker-editor" id="markerEd_ziel" data-field="ziel"></textarea>
+                </div>
+                <div class="marker-advanced-field">
+                    <div class="field-label">Beschreibung</div>
+                    <textarea class="marker-editor" id="markerEd_description" data-field="description"></textarea>
+                </div>
+                <div class="marker-advanced-field">
+                    <div class="field-label">🪞 Reflexion</div>
+                    <textarea class="marker-editor" id="markerEd_reflexion" data-field="reflexion"></textarea>
+                </div>
+            </div>
+        </details>
+
+        <details class="marker-advanced" open>
+            <summary>
+                <span class="marker-advanced-caret" aria-hidden="true">▸</span>
+                <span class="marker-advanced-label">🤖 KI</span>
+            </summary>
+            <div class="marker-advanced-body">
+                <div class="marker-advanced-field">
+                    <div class="field-label">💡 Prompt-Idee</div>
+                    <textarea class="marker-editor" id="markerEd_promptIdee" data-field="promptIdee"></textarea>
+                </div>
+                <div class="marker-advanced-field">
+                    <div class="field-label">🤖 Modell</div>
+                    <input class="marker-input" data-field="model" maxlength="200" />
+                </div>
+            </div>
+        </details>
+
+        <details class="marker-advanced" data-role="marker-advanced">
+            <summary>
+                <span class="marker-advanced-caret" aria-hidden="true">▸</span>
+                <span class="marker-advanced-label">Mehr · Datenablage · Quellen</span>
+            </summary>
+            <div class="marker-advanced-body">
+                <div class="marker-advanced-field">
+                    <div class="field-label">🗂 Datenablage</div>
+                    <textarea class="marker-editor" id="markerEd_datenablage" data-field="datenablage"></textarea>
+                </div>
+                <div class="marker-advanced-field">
+                    <div class="field-label">🔗 Quellen</div>
+                    <textarea class="marker-editor" id="markerEd_quellen" data-field="quellen"></textarea>
+                </div>
+            </div>
+        </details>
+    </div>
+</div>
+
+<script>
+(function(){
+    const panel = document.querySelector('[data-role="marker-panel"]');
+    if (!panel) return;
+
+    let activeMarkerId = null;
+    let activeSceneMarkers = [];
+    let editorsReady = false;
+    const editorFields = ['description', 'ziel', 'promptIdee', 'reflexion', 'datenablage', 'quellen'];
+    const chipStrip = panel.querySelector('[data-role="marker-chip-strip"]');
+
+    function renderChipStrip(markers, activeId) {
+        if (!chipStrip) return;
+        chipStrip.innerHTML = '';
+        (markers || []).forEach(m => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'marker-chip';
+            btn.style.background = m.colorHex || '#ef4444';
+            btn.dataset.markerId = String(m.id);
+            btn.setAttribute('role', 'tab');
+            btn.setAttribute('aria-selected', m.id === activeId ? 'true' : 'false');
+            btn.title = 'Marker ' + m.number;
+            btn.textContent = m.number;
+            btn.addEventListener('click', () => selectExternal(m.id));
+            chipStrip.appendChild(btn);
+        });
+        const active = chipStrip.querySelector('.marker-chip[aria-selected="true"]');
+        if (active) active.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }
+
+    function tinyInit() {
+        if (editorsReady || !window.tinymce) return;
+        editorsReady = true;
+
+        tinymce.init({
+            selector: '.marker-editor',
+            license_key: 'gpl',
+            height: 220,
+            min_height: 120,
+            resize: true,
+            statusbar: true,
+            elementpath: false,
+            menubar: 'file edit view insert format tools table help',
+            // NOTE: TinyMCE 7 removed the standalone 'hr' plugin — 'hr' is now a core button.
+            plugins: 'advlist anchor autolink autosave autoresize charmap code codesample directionality emoticons fullscreen help image importcss insertdatetime link lists media nonbreaking pagebreak preview quickbars save searchreplace table visualblocks visualchars wordcount',
+            toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor removeformat | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table emoticons charmap hr | code fullscreen preview',
+            toolbar_mode: 'sliding',
+            branding: false,
+            promotion: false,
+            contextmenu: 'link image table',
+            quickbars_selection_toolbar: 'bold italic underline | link blockquote',
+            quickbars_insert_toolbar: 'quickimage quicktable',
+            // Disallow pasting images inline — a single base64-pasted screenshot
+            // easily pushes the PATCH body past the server's request-size limit
+            // and produces a 400. Users can still upload via the image toolbar.
+            paste_data_images: false,
+            image_caption: true,
+            image_advtab: true,
+            link_default_target: '_blank',
+            content_style: 'body { font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size:14px; }',
+            setup(editor) {
+                editor.on('blur', () => {
+                    if (!activeMarkerId) return;
+                    const el = editor.getElement();
+                    const field = el?.dataset?.field;
+                    if (!field) return;
+                    const content = editor.getContent();
+                    window.Builder.patchField('marker', activeMarkerId, field, content);
+                    const m = activeSceneMarkers.find(x => x.id === activeMarkerId);
+                    if (m) m[field] = content;
+                });
+            }
+        });
+    }
+
+    function fillEditors(m) {
+        tinyInit();
+        editorFields.forEach(field => {
+            const ed = tinymce.get('markerEd_' + field);
+            const value = m[field] ?? '';
+            if (ed) { try { ed.setContent(value); } catch {} }
+            else {
+                const el = document.getElementById('markerEd_' + field);
+                if (el) el.value = value;
+            }
+        });
+        panel.querySelectorAll('.color-swatch').forEach(s =>
+            s.classList.toggle('is-active', s.dataset.color === m.colorHex));
+        const modelInput = panel.querySelector('[data-field="model"]');
+        if (modelInput) modelInput.value = m.model ?? '';
+        const taxoSel = panel.querySelector('[data-field="taxonomie"]');
+        if (taxoSel) {
+            const v = (m.taxonomie != null) ? String(m.taxonomie) : '';
+            // If the marker's current taxonomie is higher than the storyboard cap
+            // (e.g. cap was lowered later), still show it so the user can see / lower it.
+            if (v !== '' && !Array.from(taxoSel.options).some(o => o.value === v)) {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = (Number(v) + 1) + '. (über dem aktuellen Board-Max)';
+                taxoSel.appendChild(opt);
+            }
+            taxoSel.value = v;
+        }
+    }
+
+    panel.querySelector('[data-field="taxonomie"]')?.addEventListener('change', (ev) => {
+        if (!activeMarkerId) return;
+        const raw = ev.target.value;
+        // Server's default JSON binder rejects null for nullable enums, and the
+        // PATCH handler treats null as "don't change" anyway — so skip the call.
+        if (raw === '') return;
+        const value = Number(raw);
+        if (!Number.isFinite(value)) return;
+        window.Builder.patchField('marker', activeMarkerId, 'taxonomie', value, { immediate: true });
+        const m = activeSceneMarkers.find(x => x.id === activeMarkerId);
+        if (m) m.taxonomie = value;
+    });
+
+    panel.querySelector('.marker-input')?.addEventListener('blur', (ev) => {
+        if (!activeMarkerId) return;
+        window.Builder.patchField('marker', activeMarkerId, ev.target.dataset.field, ev.target.value);
+    });
+
+    function applyMarkerColor(hex) {
+        if (!activeMarkerId || !hex) return;
+        window.Builder.patchField('marker', activeMarkerId, 'colorHex', hex, { immediate: true });
+        panel.querySelectorAll('.color-swatch').forEach(s =>
+            s.classList.toggle('is-active', s.dataset && s.dataset.color === hex));
+        const dot = document.querySelector(`.marker-dot[data-marker-id="${activeMarkerId}"]`);
+        if (dot) dot.style.background = hex;
+        const chip = chipStrip?.querySelector(`.marker-chip[data-marker-id="${activeMarkerId}"]`);
+        if (chip) chip.style.background = hex;
+        const m = activeSceneMarkers.find(x => x.id === activeMarkerId);
+        if (m) m.colorHex = hex;
+    }
+
+    panel.querySelector('[data-role="color-picker"]')?.addEventListener('click', (ev) => {
+        // Custom-color label: let the native input open its dialog.
+        if (ev.target.closest('[data-role="color-swatch-custom"]')) return;
+        const b = ev.target.closest('.color-swatch[data-color]'); if (!b) return;
+        applyMarkerColor(b.dataset.color);
+    });
+
+    panel.querySelector('[data-role="color-free"]')?.addEventListener('input', (ev) => {
+        applyMarkerColor(ev.target.value);
+    });
+
+    panel.querySelector('[data-action="marker-delete"]')?.addEventListener('click', async () => {
+        if (!activeMarkerId || !confirm('Marker löschen?')) return;
+        const sceneIdEl = document.querySelector('.step2-scene-name');
+        const sceneId = sceneIdEl ? Number(sceneIdEl.dataset.builderId) : null;
+        if (!sceneId) return;
+        const deletedId = activeMarkerId;
+        const res = await fetch(window.apiUrl(`/api/scenes/${sceneId}/markers/${deletedId}`), { method: 'DELETE' });
+        if (!res.ok) { window.Builder?.setChip('error', '⚠ Löschen fehlgeschlagen'); return; }
+        const data = await res.json().catch(() => ({ order: [] }));
+        const order = Array.isArray(data.order) ? data.order : [];
+        const numberById = new Map(order.map(o => [o.id, o.number]));
+
+        document.querySelector(`.marker-dot[data-marker-id="${deletedId}"]`)?.remove();
+        document.querySelectorAll('.marker-dot').forEach(dot => {
+            const id = Number(dot.dataset.markerId);
+            if (numberById.has(id)) dot.textContent = String(numberById.get(id));
+        });
+
+        activeSceneMarkers = activeSceneMarkers
+            .filter(m => m.id !== deletedId)
+            .map(m => numberById.has(m.id) ? { ...m, number: numberById.get(m.id) } : m)
+            .sort((a, b) => a.number - b.number);
+
+        activeMarkerId = null;
+        panel.hidden = true;
+        renderChipStrip(activeSceneMarkers, null);
+        document.querySelector('[data-role="marker-panel-empty"]')?.removeAttribute('hidden');
+        window.dispatchEvent(new CustomEvent('builder:markers-renumbered', { detail: { sceneId, order } }));
+    });
+
+    function step(dir) {
+        if (!activeSceneMarkers.length) return;
+        const idx = activeSceneMarkers.findIndex(m => m.id === activeMarkerId);
+        const next = activeSceneMarkers[(idx + dir + activeSceneMarkers.length) % activeSceneMarkers.length];
+        selectExternal(next.id);
+    }
+    panel.querySelector('[data-action="marker-prev"]')?.addEventListener('click', () => step(-1));
+    panel.querySelector('[data-action="marker-next"]')?.addEventListener('click', () => step(+1));
+
+    function selectExternal(id) {
+        const m = activeSceneMarkers.find(x => x.id === id); if (!m) return;
+        activeMarkerId = id;
+        panel.hidden = false;
+        document.querySelector('[data-role="marker-panel-empty"]')?.setAttribute('hidden', '');
+        fillEditors(m);
+        renderChipStrip(activeSceneMarkers, id);
+        document.querySelectorAll('.marker-dot').forEach(d =>
+            d.setAttribute('aria-selected', String(Number(d.dataset.markerId) === id)));
+    }
+
+    window.addEventListener('builder:marker-selected', (ev) => {
+        activeSceneMarkers = ev.detail.scene?.markers || [];
+        selectExternal(ev.detail.markerId);
+    });
+
+    window.addEventListener('builder:scene-changed', (ev) => {
+        activeSceneMarkers = ev.detail.scene?.markers || [];
+        activeMarkerId = null;
+        panel.hidden = true;
+        document.querySelector('[data-role="marker-panel-empty"]')?.removeAttribute('hidden');
+        renderChipStrip(activeSceneMarkers, null);
+    });
+})();
+</script>

@@ -1,18 +1,33 @@
 ﻿@if (TempData["success"] != null)
 {
-	<script src="~/lib/jquery/dist/jquery.min.js"></script>
-	<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 	<script type="text/javascript">
-
-		toastr.success('@TempData["success"]');
+		(function () {
+			var msg = '@Html.Raw(Html.Encode(TempData["success"]))';
+			function show() {
+				if (window.SB && typeof SB.toast === 'function') { SB.toast(msg, 'success'); }
+				else if (typeof toastr !== 'undefined') { toastr.success(msg); }
+				else { console.log(msg); }
+			}
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', show);
+			} else { show(); }
+		})();
 	</script>
 }
 
 @if (TempData["error"] != null)
 {
-	<script src="~/lib/jquery/dist/jquery.min.js"></script>
-	<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
 	<script type="text/javascript">
-		toastr.Error('@TempData["success"]');
+		(function () {
+			var msg = '@Html.Raw(Html.Encode(TempData["error"]))';
+			function show() {
+				if (window.SB && typeof SB.toast === 'function') { SB.toast(msg, 'error'); }
+				else if (typeof toastr !== 'undefined') { toastr.error(msg); }
+				else { console.log(msg); }
+			}
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', show);
+			} else { show(); }
+		})();
 	</script>
 }

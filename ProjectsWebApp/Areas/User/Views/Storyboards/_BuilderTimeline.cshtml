@@ -1,0 +1,33 @@
+@model ProjectsWebApp.Models.Storyboard
+@{
+    var hasScenes = Model.Scenes?.Any() == true;
+    var hasInfo = !string.IsNullOrWhiteSpace(Model.Title) && Model.Title != "Unbenanntes Storyboard";
+}
+
+<header class="builder-header">
+    <a class="builder-back" asp-action="Index" title="Zurück zur Übersicht" aria-label="Zurück">
+        <span aria-hidden="true">‹</span> Zurück
+    </a>
+
+    <nav class="builder-timeline" aria-label="Storyboard-Schritte">
+        <button class="builder-step" data-step="1" data-done="@(hasInfo ? "true" : "false")" type="button">
+            <span class="builder-step-num">@(hasInfo ? "✓" : "1")</span>
+            <span class="builder-step-label">Infos</span>
+        </button>
+        <span class="builder-step-sep">—</span>
+        <button class="builder-step" data-step="2" data-done="@(hasScenes ? "true" : "false")" type="button">
+            <span class="builder-step-num">@(hasScenes ? "✓" : "2")</span>
+            <span class="builder-step-label">Szenen &amp; Marker</span>
+        </button>
+        <span class="builder-step-sep">—</span>
+        <button class="builder-step" data-step="3" type="button">
+            <span class="builder-step-num">3</span>
+            <span class="builder-step-label">Vorschau &amp; PDF</span>
+        </button>
+    </nav>
+
+    <div class="builder-save-chip" data-state="idle" aria-live="polite">
+        <span class="builder-save-dot"></span>
+        <span class="builder-save-text">Bereit</span>
+    </div>
+</header>

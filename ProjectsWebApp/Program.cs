@@ -218,7 +218,17 @@ if (!string.IsNullOrEmpty(appBasePath) && appBasePath != "/")
     app.UsePathBase(appBasePath);
 }
 
-app.UseStaticFiles();
+// Serve static files with extended MIME types for H5P content
+var staticFileProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+staticFileProvider.Mappings[".h5p"] = "application/zip";
+if (!staticFileProvider.Mappings.ContainsKey(".json"))
+    staticFileProvider.Mappings[".json"] = "application/json";
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = staticFileProvider,
+    ServeUnknownFileTypes = true,
+    DefaultContentType = "application/octet-stream"
+});
 
 app.UseRouting();
 app.UseRateLimiter();

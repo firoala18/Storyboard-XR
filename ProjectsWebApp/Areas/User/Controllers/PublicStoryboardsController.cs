@@ -101,10 +101,15 @@ namespace ProjectsWebApp.Areas.User.Controllers
             return slug;
         }
 
-        private Task<Storyboard?> FindBySlugAsync(string slug, bool includeScenes = true)
+        private Task<Storyboard?> FindBySlugAsync(string slug, bool includeScenes = true, bool includeMarkers = false)
         {
             var q = _context.Storyboards.AsQueryable();
-            if (includeScenes) q = q.Include(s => s.Scenes);
+            if (includeScenes)
+            {
+                q = includeMarkers
+                    ? q.Include(s => s.Scenes).ThenInclude(sc => sc.Markers)
+                    : q.Include(s => s.Scenes);
+            }
             return q.FirstOrDefaultAsync(s => s.PublicId == slug);
         }
 
@@ -116,6 +121,9 @@ namespace ProjectsWebApp.Areas.User.Controllers
         [HttpGet("my")]
         public async Task<IActionResult> My()
         {
+            if (User.Identity?.IsAuthenticated == true)
+                return RedirectToAction("Index", "Storyboards", new { area = "User" });
+
             var ownerTokenHash = Sha256Hex(GetOrCreateAnonToken());
 
             var items = await _context.Storyboards
@@ -237,7 +245,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
         [HttpGet("{slug}")]
         public async Task<IActionResult> ViewBySlug(string slug, [FromQuery] string? k)
         {
-            var sb = await FindBySlugAsync(slug, includeScenes: true);
+            var sb = await FindBySlugAsync(slug, includeScenes: true, includeMarkers: true);
             if (sb == null) return NotFound();
 
             if (!string.IsNullOrWhiteSpace(k) &&
@@ -266,7 +274,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
         [HttpGet("{slug}/open")]
         public async Task<IActionResult> OpenBySlug(string slug)
         {
-            var sb = await FindBySlugAsync(slug, includeScenes: true);
+            var sb = await FindBySlugAsync(slug, includeScenes: true, includeMarkers: true);
             if (sb == null) return NotFound();
 
             ViewBag.ActiveSceneId = sb.Scenes?
@@ -281,18 +289,20 @@ namespace ProjectsWebApp.Areas.User.Controllers
             ViewData["ReadOnly"] = !canWrite;
             ViewBag.IsStaff = isStaff;
             ViewBag.CanGenerateAi = canWrite || isStaff;
-            return View("~/Areas/User/Views/Storyboards/Details.cshtml", sb);
+            ViewBag.InitialStep = 2;
+            return View("~/Areas/User/Views/Storyboards/Builder.cshtml", sb);
         }
 
         [HttpGet("{slug}/edit")]
         public async Task<IActionResult> EditBySlug(string slug)
         {
-            var sb = await FindBySlugAsync(slug, includeScenes: false);
+            var sb = await FindBySlugAsync(slug, includeScenes: true, includeMarkers: true);
             if (sb == null) return NotFound();
             if (!CanWrite(sb)) return Forbid();
 
-            ViewData["PublicSlug"] = slug; // <-- important for the form action/links
-            return View("~/Areas/User/Views/Storyboards/Edit.cshtml", sb);
+            ViewData["PublicSlug"] = slug;
+            ViewBag.InitialStep = 1;
+            return View("~/Areas/User/Views/Storyboards/Builder.cshtml", sb);
         }
 
         [HttpPost("{slug}/edit")]

@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using ProjectsWebApp.DataAccsess.Data;
 using ProjectsWebApp.Hubs;
 using ProjectsWebApp.Models;
+using ProjectsWebApp.Models.Dtos;
 
 namespace ProjectsWebApp.Areas.User.Controllers
 {
@@ -474,6 +475,167 @@ namespace ProjectsWebApp.Areas.User.Controllers
             if (!string.IsNullOrWhiteSpace(scene.Storyboard.PublicId))
                 return RedirectToAction("OpenBySlug", "PublicStoryboards", new { area = "User", slug = scene.Storyboard.PublicId });
             return RedirectToAction("Details", "Storyboards", new { area = "User", id = storyboardId, sceneId = nextSceneId });
+        }
+
+        // POST /Scenes/AddEmpty
+        // Creates an empty scene (no image) for the Builder's "+ add scene" flow.
+        // The image can be uploaded later via UploadImage.
+        [AllowAnonymous]
+        [HttpPost("/Scenes/AddEmpty")]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> AddEmpty([FromForm] int storyboardId)
+        {
+            var sb = await _context.Storyboards.FindAsync(storyboardId);
+            if (sb == null) return NotFound();
+            if (!CanWrite(sb)) return Forbid();
+
+            var next = (await _context.Scenes
+                            .Where(s => s.StoryboardId == storyboardId)
+                            .Select(s => (int?)s.Number)
+                            .MaxAsync()) ?? 0;
+
+            var sc = new Scene
+            {
+                StoryboardId = storyboardId,
+                Number = next + 1,
+                Name = null,
+                ImagePath = string.Empty
+            };
+
+            _context.Scenes.Add(sc);
+            await _context.SaveChangesAsync();
+
+            await _hub.Clients.Group($"sb-{storyboardId}").SendAsync("SceneCreated", new
+            {
+                sc.Id,
+                sc.Number,
+                sc.Name,
+                sc.ImagePath,
+                sc.StoryboardId
+            });
+
+            return Json(new
+            {
+                id = sc.Id,
+                number = sc.Number,
+                name = sc.Name,
+                imagePath = (string?)null,
+                rowVersion = sc.RowVersion,
+                markers = Array.Empty<object>()
+            });
+        }
+
+        // POST /Scenes/UploadImage/{id}
+        // Uploads or replaces a scene's image. Returns the resolved public URL.
+        [AllowAnonymous]
+        [HttpPost("/Scenes/UploadImage/{id:int}")]
+        [IgnoreAntiforgeryToken]
+        [RequestSizeLimit(64_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 64_000_000)]
+        public async Task<IActionResult> UploadImage(int id, IFormFile image)
+        {
+            var sc = await _context.Scenes.Include(s => s.Storyboard).FirstOrDefaultAsync(s => s.Id == id);
+            if (sc == null || sc.Storyboard == null) return NotFound();
+            if (!CanWrite(sc.Storyboard)) return Forbid();
+            if (image == null || image.Length == 0) return BadRequest(new { message = "Keine Datei empfangen." });
+
+            var allowed = new[] { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
+            var ext = Path.GetExtension(image.FileName).ToLowerInvariant();
+            if (!allowed.Contains(ext)) return BadRequest(new { message = "Nur PNG/JPG/WebP/GIF erlaubt." });
+
+            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+            var uploadsDir = Path.Combine(webRoot, "uploads");
+            Directory.CreateDirectory(uploadsDir);
+
+            var fileName = $"{Guid.NewGuid():N}{ext}";
+            var dest = Path.Combine(uploadsDir, fileName);
+            await using (var fs = System.IO.File.Create(dest))
+                await image.CopyToAsync(fs);
+
+            if (!string.IsNullOrWhiteSpace(sc.ImagePath))
+            {
+                var oldPath = Path.Combine(webRoot, sc.ImagePath.TrimStart('/'));
+                if (System.IO.File.Exists(oldPath))
+                {
+                    try { System.IO.File.Delete(oldPath); } catch { /* best-effort */ }
+                }
+            }
+
+            sc.ImagePath = "/uploads/" + fileName;
+            await _context.SaveChangesAsync();
+
+            return Json(new { imagePath = Url.Content("~" + sc.ImagePath), rowVersion = sc.RowVersion });
+        }
+
+        // GET /Scenes/{id}?format=json
+        // Returns scene + markers as JSON for the Builder Step 2 canvas.
+        [AllowAnonymous]
+        [HttpGet("/Scenes/{id:int}")]
+        public async Task<IActionResult> Get(int id, string? format)
+        {
+            if (format != "json") return NotFound();
+
+            var s = await _context.Scenes
+                .Include(x => x.Markers)
+                .Include(x => x.Storyboard)
+                .FirstOrDefaultAsync(x => x.Id == id);
+            if (s == null || s.Storyboard == null) return NotFound();
+            if (!CanWrite(s.Storyboard)) return Forbid();
+
+            return Json(new
+            {
+                id = s.Id,
+                number = s.Number,
+                name = s.Name,
+                imagePath = string.IsNullOrWhiteSpace(s.ImagePath) ? null : Url.Content("~" + s.ImagePath),
+                rowVersion = s.RowVersion,
+                markers = s.Markers.OrderBy(m => m.Number).Select(m => new
+                {
+                    id = m.Id,
+                    x = m.X,
+                    y = m.Y,
+                    number = m.Number,
+                    colorHex = m.ColorHex,
+                    description = m.Description,
+                    ziel = m.Ziel,
+                    datenablage = m.Datenablage,
+                    quellen = m.Quellen,
+                    promptIdee = m.PromptIdee,
+                    reflexion = m.Reflexion,
+                    model = m.Model,
+                    taxonomie = m.Taxonomie,
+                    rowVersion = m.RowVersion
+                })
+            });
+        }
+
+        // PATCH /Scenes/{id}
+        // Partial update for inline scene edits. null = leave unchanged.
+        [AllowAnonymous]
+        [HttpPatch("/Scenes/{id:int}")]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> Patch(int id, [FromBody] ScenePatchDto dto)
+        {
+            if (dto == null) return BadRequest();
+
+            var scene = await _context.Scenes.Include(s => s.Storyboard).FirstOrDefaultAsync(s => s.Id == id);
+            if (scene == null || scene.Storyboard == null) return NotFound();
+            if (!CanWrite(scene.Storyboard)) return Forbid();
+
+            if (dto.RowVersion != null && scene.RowVersion != null &&
+                !dto.RowVersion.SequenceEqual(scene.RowVersion))
+            {
+                return Conflict(new { reason = "stale", rowVersion = scene.RowVersion });
+            }
+
+            if (dto.Name is not null) scene.Name = dto.Name;
+            if (dto.Number is not null) scene.Number = dto.Number.Value;
+            if (dto.ImagePath is not null) scene.ImagePath = dto.ImagePath;
+
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return Conflict(new { reason = "stale" }); }
+
+            return Ok(new { ok = true, rowVersion = scene.RowVersion });
         }
     }
 }

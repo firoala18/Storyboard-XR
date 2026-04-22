@@ -25,6 +25,9 @@ namespace ProjectsWebApp.Models
         [Required]
         public string ImagePath { get; set; } = string.Empty;
 
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
+
         public List<Marker> Markers { get; set; } = new();
     }
 }

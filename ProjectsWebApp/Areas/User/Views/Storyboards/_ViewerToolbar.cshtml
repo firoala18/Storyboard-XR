@@ -1,0 +1,38 @@
+@model ProjectsWebApp.Models.Storyboard
+@{
+    var basePath = Context.Request.PathBase.HasValue ? Context.Request.PathBase.Value : "";
+    var publicSlug = ViewData["PublicSlug"] as string;
+    var isAuthenticated = User?.Identity?.IsAuthenticated ?? false;
+    var backHref = (!string.IsNullOrWhiteSpace(publicSlug) || !isAuthenticated)
+        ? (basePath + "/s/my")
+        : Url.Action("Index", "Storyboards", new { area = "User" });
+    var shareEnabled = !string.IsNullOrWhiteSpace(Model.PublicId);
+}
+
+<div class="viewer-toolbar" data-role="viewer-toolbar">
+    <a href="@backHref" class="viewer-tb-back" aria-label="Zurück">
+        <span aria-hidden="true">‹</span> Zurück
+    </a>
+    <h1 class="viewer-tb-title" title="@Model.Title">@Model.Title</h1>
+    <div class="viewer-tb-actions">
+        <button type="button" class="viewer-tb-btn" data-action="open-search" aria-label="Suchen" title="Marker suchen (/)">
+            <span aria-hidden="true">🔍</span><span class="viewer-tb-label">Suchen</span>
+        </button>
+        <button type="button" class="viewer-tb-btn" data-action="toggle-info" aria-label="Info" title="Storyboard-Info ein/aus">
+            <span aria-hidden="true">ℹ️</span><span class="viewer-tb-label">Info</span>
+        </button>
+        <button type="button" class="viewer-tb-btn" data-action="toggle-fullscreen" aria-label="Vollbild" title="Vollbild">
+            <span aria-hidden="true">⛶</span><span class="viewer-tb-label">Vollbild</span>
+        </button>
+        <button type="button" class="viewer-tb-btn" data-action="export-pdf" aria-label="PDF exportieren" title="Als PDF exportieren">
+            <span aria-hidden="true">📄</span><span class="viewer-tb-label">PDF</span>
+        </button>
+        @if (shareEnabled)
+        {
+            <button type="button" class="viewer-tb-btn" data-action="copy-share" aria-label="Link kopieren" title="Freigabelink kopieren"
+                    data-share-url="@($"{Context.Request.Scheme}://{Context.Request.Host}{basePath}/s/{Model.PublicId}")">
+                <span aria-hidden="true">🔗</span><span class="viewer-tb-label">Teilen</span>
+            </button>
+        }
+    </div>
+</div>

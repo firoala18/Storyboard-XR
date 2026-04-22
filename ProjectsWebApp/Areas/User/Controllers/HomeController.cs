@@ -189,6 +189,10 @@ namespace ProjectsWebApp.Areas.User.Controllers
             return View(contents);
         }
 
+        // GET /User/Home/Umfrage — static standalone survey page, reachable by direct URL only.
+        [HttpGet]
+        public IActionResult Umfrage() => View();
+
 
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

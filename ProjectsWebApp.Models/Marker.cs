@@ -18,12 +18,14 @@ namespace ProjectsWebApp.Models
         public int Number { get; set; }
         [MaxLength(9)] public string ColorHex { get; set; } = "#78a7ff";
 
-        [MaxLength(2000)] public string Description { get; set; } = string.Empty;
-        [MaxLength(2000)] public string Ziel { get; set; } = string.Empty;
-        [MaxLength(2000)] public string Datenablage { get; set; } = string.Empty;
-        [MaxLength(2000)] public string Quellen { get; set; } = string.Empty;
-        [MaxLength(2000)] public string PromptIdee { get; set; } = string.Empty;
-        [MaxLength(2000)] public string Reflexion { get; set; } = string.Empty;
+        // Rich-text HTML (TinyMCE) — unbounded so long/formatted content
+        // doesn't blow past a varchar limit and produce a 500 on save.
+        public string Description { get; set; } = string.Empty;
+        public string Ziel { get; set; } = string.Empty;
+        public string Datenablage { get; set; } = string.Empty;
+        public string Quellen { get; set; } = string.Empty;
+        public string PromptIdee { get; set; } = string.Empty;
+        public string Reflexion { get; set; } = string.Empty;
         [MaxLength(200)] public string Model { get; set; } = string.Empty;
 
         // NEW: Individual taxonomy level per marker (limited to storyboard's maximum)
@@ -32,5 +34,8 @@ namespace ProjectsWebApp.Models
         // NEW: scope to a Scene (not storyboard)
         public int SceneId { get; set; }
         public Scene? Scene { get; set; }
+
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
     }
 }

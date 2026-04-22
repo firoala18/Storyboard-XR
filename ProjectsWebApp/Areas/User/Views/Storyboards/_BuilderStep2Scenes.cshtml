@@ -1,0 +1,138 @@
+@model ProjectsWebApp.Models.Storyboard
+@{
+    var scenes = (Model.Scenes ?? Enumerable.Empty<ProjectsWebApp.Models.Scene>())
+                 .OrderBy(s => s.Number).ToList();
+    var basePath = Context.Request.PathBase.HasValue ? Context.Request.PathBase.Value : "";
+}
+
+<div class="step2" data-role="step2-grid">
+    <aside class="step2-rail" data-role="rail" data-panel="rail">
+        <header class="step2-aside-head">
+            <div class="field-label step2-aside-title">Szenen · <span class="scene-count">@scenes.Count</span></div>
+            <button type="button" class="step2-collapse-btn" data-action="toggle-rail" aria-label="Seitenleiste ein-/ausklappen" title="Szenen-Leiste ein/aus">
+                <span class="step2-chev">‹</span>
+            </button>
+        </header>
+
+        <div class="step2-aside-body step2-aside-expanded">
+            <ul class="scene-rail" data-storyboard-id="@Model.Id">
+                @foreach (var sc in scenes)
+                {
+                    <li class="scene-thumb" data-scene-id="@sc.Id" data-scene-number="@sc.Number">
+                        <span class="scene-num">@sc.Number</span>
+                        <div class="scene-thumb-img">
+                            @if (!string.IsNullOrWhiteSpace(sc.ImagePath))
+                            {
+                                <img src="@(basePath + sc.ImagePath)" alt="@sc.Name" />
+                            }
+                        </div>
+                        <span class="scene-thumb-name">@(string.IsNullOrWhiteSpace(sc.Name) ? "(unbenannt)" : sc.Name)</span>
+                    </li>
+                }
+            </ul>
+
+            <div class="scene-rail-actions">
+                <button type="button" class="btn-secondary" data-action="add-scene">+ Szene hinzufügen</button>
+                <button type="button" class="btn-primary-green" data-action="generate-ai-scene">✨ AI-Szene generieren</button>
+            </div>
+        </div>
+
+        <div class="step2-aside-collapsed" data-role="rail-compact">
+            <ul class="scene-rail-compact">
+                @foreach (var sc in scenes)
+                {
+                    <li class="scene-thumb-mini" data-scene-id="@sc.Id" data-scene-number="@sc.Number" title="Szene @sc.Number @(sc.Name ?? "")">
+                        <span class="scene-thumb-mini-num">@sc.Number</span>
+                        @if (!string.IsNullOrWhiteSpace(sc.ImagePath))
+                        {
+                            <img src="@(basePath + sc.ImagePath)" alt="" />
+                        }
+                    </li>
+                }
+            </ul>
+            <button type="button" class="scene-add-mini" data-action="add-scene" title="Szene hinzufügen">+</button>
+        </div>
+
+        <div class="step2-resize-handle" data-role="resize-rail" aria-hidden="true">
+            <span class="step2-resize-grip"></span>
+        </div>
+    </aside>
+
+    <section class="step2-canvas-wrap">
+        <header class="step2-scene-header">
+            <div>
+                <div class="field-label">Szene <span class="active-scene-num">—</span></div>
+                <div class="step2-scene-name"
+                     data-builder-edit
+                     data-builder-entity="scene"
+                     data-builder-multiline="false"
+                     data-builder-field="name"
+                     data-builder-id=""></div>
+            </div>
+            <div class="step2-scene-actions">
+                <div class="step2-zoom-controls" data-role="zoom-controls" title="Zoom · Shift+Ziehen zum Verschieben · Rad zum Zoomen">
+                    <button type="button" class="step2-zoom-btn" data-action="zoom-out" aria-label="Verkleinern">−</button>
+                    <span class="step2-zoom-level" data-role="zoom-level">100%</span>
+                    <button type="button" class="step2-zoom-btn" data-action="zoom-in" aria-label="Vergrößern">+</button>
+                    <button type="button" class="step2-zoom-btn" data-action="zoom-reset" aria-label="Ansicht zurücksetzen" title="Ansicht zurücksetzen">⌾</button>
+                </div>
+                <button type="button" class="btn-secondary" data-action="replace-scene-image" data-role="scene-image-btn">↑ Bild hochladen</button>
+                <input type="file" accept="image/*" hidden data-input="replace-scene-image" />
+                <button type="button" class="btn-danger" data-action="delete-scene">🗑 Löschen</button>
+            </div>
+        </header>
+
+        <div class="step2-canvas" data-role="marker-canvas">
+            <div class="step2-canvas-hint" data-role="canvas-hint">Wähle eine Szene aus, oder erstelle eine neue.</div>
+        </div>
+    </section>
+
+    <aside class="step2-marker-panel" data-panel="panel">
+        <div class="step2-resize-handle step2-resize-handle-left" data-role="resize-panel" aria-hidden="true">
+            <span class="step2-resize-grip"></span>
+        </div>
+        <header class="step2-aside-head" data-role="panel-drag-handle">
+            <button type="button" class="step2-collapse-btn step2-collapse-btn-left" data-action="toggle-panel" aria-label="Marker-Panel ein-/ausklappen" title="Marker-Panel ein/aus">
+                <span class="step2-chev">›</span>
+            </button>
+            <div class="field-label step2-aside-title">Marker</div>
+            <div class="step2-panel-height-controls" data-role="panel-height-controls" title="Panel-Höhe anpassen">
+                <button type="button" class="step2-collapse-btn" data-action="panel-height-dec" aria-label="Panel verkleinern" title="Kleiner">−</button>
+                <button type="button" class="step2-collapse-btn" data-action="panel-height-inc" aria-label="Panel vergrößern" title="Größer">+</button>
+            </div>
+            <div class="step2-dock-menu" data-role="dock-menu">
+                <button type="button" class="step2-collapse-btn" data-action="toggle-dock-menu"
+                        aria-haspopup="menu" aria-expanded="false"
+                        aria-label="Marker-Panel andocken" title="Andocken">
+                    <span class="step2-float-icon" aria-hidden="true"></span>
+                </button>
+                <ul class="step2-dock-dropdown" role="menu" hidden>
+                    <li role="none">
+                        <button type="button" role="menuitemradio" data-action="set-panel-mode" data-mode="docked">
+                            <span class="step2-dock-ico step2-dock-ico--docked" aria-hidden="true"></span>
+                            Rechts angedockt
+                        </button>
+                    </li>
+                    <li role="none">
+                        <button type="button" role="menuitemradio" data-action="set-panel-mode" data-mode="floating">
+                            <span class="step2-dock-ico step2-dock-ico--floating" aria-hidden="true"></span>
+                            Schwebend
+                        </button>
+                    </li>
+                    <li role="none">
+                        <button type="button" role="menuitemradio" data-action="set-panel-mode" data-mode="below">
+                            <span class="step2-dock-ico step2-dock-ico--below" aria-hidden="true"></span>
+                            Unter dem Bild
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </header>
+        <div class="step2-aside-body step2-aside-expanded">
+            @await Html.PartialAsync("~/Areas/User/Views/Storyboards/_MarkerPanel.cshtml", Model)
+        </div>
+        <div class="step2-aside-collapsed" data-role="panel-compact">
+            <ul class="marker-rail-compact" data-role="marker-mini-list"></ul>
+        </div>
+    </aside>
+</div>

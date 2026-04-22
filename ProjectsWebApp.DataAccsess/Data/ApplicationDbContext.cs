@@ -49,6 +49,9 @@ namespace ProjectsWebApp.DataAccsess.Data
 
         public DbSet<RegistrationCode> RegistrationCodes { get; set; }
 
+        //------------ H5P section ------------
+        public DbSet<H5PContent> H5PContents { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

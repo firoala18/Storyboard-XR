@@ -725,15 +725,15 @@
           initNoteById('Beschreibung');
           initNoteById('licenseExtras');
 
-          // Cover image size/type validation (2 MB) on change
+          // Cover image size/type validation (30 MB) on change
           const coverInput = document.getElementById('image');
           coverInput?.addEventListener('change', () => {
             const f = coverInput.files && coverInput.files[0];
             if (!f) return;
 
-            const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+            const MAX_SIZE = 30 * 1024 * 1024; // 30 MB
             if (f.size > MAX_SIZE) {
-              const msg = 'Das Bild ist zu groß. Maximal 2 MB pro Bild erlaubt.';
+              const msg = 'Das Bild ist zu groß. Maximal 30 MB pro Bild erlaubt.';
               if (window.SB && SB.alert) SB.alert(msg, 'error', 'Bild zu groß');
               else if (window.Swal) Swal.fire({ icon: 'error', title: 'Bild zu groß', text: msg });
               else alert(msg);

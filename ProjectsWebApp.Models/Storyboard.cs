@@ -77,6 +77,9 @@ namespace ProjectsWebApp.Models
         [MaxLength(64)]
         public string? OwnerTokenHash { get; set; }
 
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
+
         public List<Scene> Scenes { get; set; } = new();
     }
 }

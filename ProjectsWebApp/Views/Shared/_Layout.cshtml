@@ -126,6 +126,17 @@
     <link rel="icon" type="image/x-icon" href="/logo-PromptCoach-transparenz.svg">
 
   <base href="@Context.Request.PathBase/" />
+    <script>
+        // Exposes the app's sub-path (e.g. "" locally, "/apps/storyboard" in prod).
+        // All JS fetches and navigation should prepend this to absolute server paths.
+        window.APP_PATH_BASE = '@Context.Request.PathBase';
+        window.apiUrl = function (p) {
+            if (!p) return window.APP_PATH_BASE || '';
+            if (/^https?:\/\//i.test(p)) return p;
+            if (p.charAt(0) !== '/') p = '/' + p;
+            return (window.APP_PATH_BASE || '') + p;
+        };
+    </script>
 
 
     <!-- ✅ Bootstrap 5 -->
@@ -181,7 +192,7 @@
 
     /* Improved Footer Styles */
     .footer {
-        background-color: #89ba17;
+        background-color: #191919;
         color: #e0e0e0;
         /* padding: 3rem 0 1.5rem; */
         font-size: 0.95rem;
@@ -309,7 +320,373 @@
 
     }
 
+    /* ── H5P Floating Iframe Panel ── */
+    .h5p-floating-panel {
+        position: fixed;
+        top: 100px; right: 24px;
+        width: min(700px, 60vw); height: min(600px, 70vh);
+        min-width: 400px; min-height: 300px;
+        max-width: 95vw; max-height: 90vh;
+        z-index: 1065;
+        background: #fff;
+        border: 1px solid #e5e7eb; border-radius: 16px;
+        box-shadow: 0 18px 40px rgba(16,24,40,.18);
+        overflow: hidden; resize: both;
+        display: flex; flex-direction: column;
+    }
+    .h5p-floating-header {
+        display: flex; align-items: center; gap: .5rem;
+        padding: .6rem 1rem; background: #f3f5f8;
+        border-bottom: 1px solid #e5e7eb;
+        cursor: move; user-select: none; flex-shrink: 0;
+    }
+    .h5p-drag-indicator {
+        display: flex; align-items: center; gap: .35rem;
+        font-size: .85rem; color: #667085;
+        background: #eef2f6; border: 1px dashed #98a2b3;
+        padding: .2rem .6rem; border-radius: 999px;
+    }
+    .h5p-floating-title { flex: 1; font-weight: 600; font-size: .95rem; color: #333; }
+    .h5p-floating-close {
+        background: none; border: none; color: #667085;
+        font-size: 1.1rem; cursor: pointer;
+        padding: .25rem .4rem; border-radius: 6px;
+        transition: background .15s ease, color .15s ease;
+    }
+    .h5p-floating-close:hover { background: #fee2e2; color: #dc2626; }
+    .h5p-floating-iframe { flex: 1; width: 100%; border: none; background: #fff; }
+    @@media (max-width: 768px) {
+        .h5p-floating-panel {
+            width: 96vw !important; height: 80vh !important;
+            left: 2vw !important; right: auto !important;
+            top: 60px !important; min-width: 0;
+        }
+    }
 
+    /* ── Authenticated user bar — editorial/academic control strip ────── */
+    .user-bar {
+        position: relative;
+        z-index: 1050;  /* above page content/subheader so the admin dropdown is visible */
+        background:
+            radial-gradient(1200px 120px at 85% -20%, rgba(137,186,23,.08), transparent 60%),
+            linear-gradient(180deg, #0b1016 0%, #0e1520 100%);
+        min-height: 56px;
+        padding: .4rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.04),
+            0 1px 0 rgba(0,0,0,.5);
+        isolation: isolate;
+    }
+    /* Ensure the admin dropdown paints above the main content */
+    .user-bar .dropdown-menu.show { z-index: 1055; }
+    /* Brand hairline at the top, fading at edges */
+    .user-bar::before {
+        content: "";
+        position: absolute; inset: 0 0 auto 0;
+        height: 1px;
+        background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(137,186,23,0) 10%,
+            rgba(137,186,23,.55) 50%,
+            rgba(137,186,23,0) 90%,
+            transparent 100%);
+        z-index: 1;
+    }
+    /* Very subtle noise for tactile depth */
+    .user-bar::after {
+        content: "";
+        position: absolute; inset: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        opacity: .035;
+        mix-blend-mode: overlay;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .user-bar > * { position: relative; z-index: 2; }
+
+    /* Left: live status */
+    .user-bar-status {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        min-width: 0;
+    }
+    .user-bar-dot {
+        position: relative;
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #89ba17;
+        box-shadow: 0 0 0 0 rgba(137,186,23,.5);
+        flex-shrink: 0;
+    }
+    .user-bar-dot::before {
+        content: "";
+        position: absolute; inset: -4px;
+        border-radius: 50%;
+        background: rgba(137,186,23,.35);
+        animation: userBarPulse 2.4s ease-out infinite;
+    }
+    @@keyframes userBarPulse {
+        0%   { transform: scale(.5); opacity: .8; }
+        100% { transform: scale(1.8); opacity: 0; }
+    }
+    .user-bar-meta {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+        min-width: 0;
+    }
+    .user-bar-label {
+        font-size: .6rem;
+        font-weight: 600;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+        color: #6b7280;
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .user-bar-name {
+        font-size: .85rem;
+        font-weight: 600;
+        color: #e5e7eb;
+        letter-spacing: .01em;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 40vw;
+    }
+    .user-bar-role {
+        font-size: .58rem;
+        font-weight: 700;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 4px;
+        color: #b6e24a;
+        background: rgba(137,186,23,.15);
+        border: 1px solid rgba(137,186,23,.3);
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    @@media (max-width: 640px) {
+        .user-bar { padding: .4rem .85rem; }
+        .user-bar-meta .user-bar-label { display: none; }
+        .user-bar-name { font-size: .78rem; max-width: 36vw; }
+    }
+
+    /* Right: action icons */
+    .user-bar-group {
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .user-bar-divider {
+        width: 1px;
+        height: 24px;
+        background: linear-gradient(180deg, transparent, rgba(255,255,255,.12) 20%, rgba(255,255,255,.12) 80%, transparent);
+        margin: 0 .4rem;
+    }
+    .user-bar-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px; height: 38px;
+        padding: 0;
+        background: rgba(255,255,255,.025);
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 10px;
+        color: #cbd5e1;
+        text-decoration: none;
+        cursor: pointer;
+        transition:
+            background .2s ease,
+            color .2s ease,
+            border-color .2s ease,
+            transform .2s cubic-bezier(.4,0,.2,1),
+            box-shadow .2s ease;
+    }
+    .user-bar-btn > i { font-size: 1.05rem; line-height: 1; }
+    .user-bar-btn:hover,
+    .user-bar-btn:focus-visible {
+        background: rgba(255,255,255,.07);
+        border-color: rgba(137,186,23,.4);
+        color: #fff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(137,186,23,.15);
+        outline: none;
+    }
+    .user-bar-btn.active,
+    .user-bar-btn[aria-expanded="true"] {
+        background: linear-gradient(180deg, rgba(137,186,23,.22), rgba(137,186,23,.12));
+        border-color: rgba(137,186,23,.55);
+        color: #d4ec85;
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.08),
+            0 4px 14px rgba(137,186,23,.2);
+    }
+    .user-bar-btn.danger:hover,
+    .user-bar-btn.danger:focus-visible {
+        background: rgba(239,68,68,.12);
+        border-color: rgba(239,68,68,.45);
+        color: #fca5a5;
+        box-shadow: 0 4px 14px rgba(239,68,68,.15);
+    }
+    .user-bar-btn.dropdown-toggle::after { display: none; }
+    .user-bar-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Custom tooltip (hover only, hidden when dropdown is open) */
+    .user-bar-btn[data-tip]::before {
+        content: attr(data-tip);
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%) translateY(-4px);
+        padding: .3rem .6rem;
+        background: #0b1016;
+        color: #e5e7eb;
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .68rem;
+        font-weight: 500;
+        letter-spacing: .04em;
+        white-space: nowrap;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 6px;
+        box-shadow: 0 6px 16px rgba(0,0,0,.4);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease, transform .15s ease;
+        z-index: 2000;
+    }
+    .user-bar-btn[data-tip]::after {
+        content: "";
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 50%;
+        width: 6px; height: 6px;
+        background: #0b1016;
+        border-left: 1px solid rgba(255,255,255,.08);
+        border-top:  1px solid rgba(255,255,255,.08);
+        transform: translateX(-50%) rotate(45deg) translateY(-4px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease, transform .15s ease;
+        z-index: 2000;
+    }
+    .user-bar-btn[data-tip]:hover::before,
+    .user-bar-btn[data-tip]:focus-visible::before {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    .user-bar-btn[data-tip]:hover::after,
+    .user-bar-btn[data-tip]:focus-visible::after {
+        opacity: 1;
+        transform: translateX(-50%) rotate(45deg) translateY(0);
+    }
+    .user-bar-btn[aria-expanded="true"]::before,
+    .user-bar-btn[aria-expanded="true"]::after { opacity: 0 !important; }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .user-bar-dot::before { animation: none; }
+        .user-bar-btn { transition: none; }
+    }
+
+    /* Refined admin dropdown (hanging off the gear button) */
+    .admin-dropdown {
+        border: 1px solid rgba(15,23,42,.06) !important;
+        border-radius: 14px !important;
+        box-shadow: 0 20px 50px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.04) !important;
+        padding: .4rem !important;
+        min-width: 240px;
+        overflow: hidden;
+    }
+    .admin-dropdown .dropdown-header {
+        font-size: .68rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: #6f9a10;
+        padding: .55rem .75rem .3rem;
+    }
+    .admin-dropdown .dropdown-item {
+        border-radius: 8px;
+        padding: .5rem .75rem;
+        font-size: .88rem;
+        color: #334155;
+        transition: background .15s ease, color .15s ease, transform .15s ease;
+    }
+    .admin-dropdown .dropdown-item:hover,
+    .admin-dropdown .dropdown-item:focus {
+        background: #f4f7f0;
+        color: #0f172a;
+        transform: translateX(2px);
+    }
+    .admin-dropdown .dropdown-item i { color: #89ba17; width: 1.1rem; text-align: center; }
+    .admin-dropdown .dropdown-divider { margin: .35rem .25rem; border-color: #f1f5f9; }
+
+    /* ── H5P Navbar Dropdown trigger (uses .user-bar-btn now, kept for backwards-compat) ── */
+    .h5p-nav-trigger {
+        background: transparent; border: none;
+        color: #fff; padding: .35rem .5rem;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 8px; cursor: pointer;
+        transition: background .15s ease;
+    }
+    .h5p-nav-trigger:hover, .h5p-nav-trigger.active { background: rgba(255,255,255,.15); }
+    .h5p-dropdown {
+        position: absolute; right: 0; top: 100%;
+        margin-top: .6rem; width: 280px;
+        background: #fff; border: none; border-radius: 14px;
+        box-shadow: 0 20px 50px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.04);
+        z-index: 1060; overflow: hidden;
+        opacity: 0; visibility: hidden;
+        transform: translateY(-8px) scale(.97);
+        transition: opacity .25s cubic-bezier(.22,1,.36,1),
+                    transform .25s cubic-bezier(.22,1,.36,1),
+                    visibility .25s;
+    }
+    .h5p-dropdown.show { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+    .h5p-dropdown-header {
+        display: flex; align-items: center; gap: .45rem;
+        padding: .7rem 1rem;
+        font-size: .7rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .06em;
+        color: #89ba17; border-bottom: 1px solid #f0f0f0;
+    }
+    .h5p-dropdown-body { padding: .5rem; }
+    .h5p-dropdown-option {
+        display: flex; align-items: center; gap: .75rem;
+        padding: .65rem .75rem; border-radius: 10px;
+        text-decoration: none; color: #374151;
+        transition: all .2s ease;
+    }
+    .h5p-dropdown-option:hover { background: #f4f7f0; color: #1a1a1a; transform: translateX(3px); }
+    .h5p-option-icon {
+        display: flex; align-items: center; justify-content: center;
+        width: 36px; height: 36px; border-radius: 10px;
+        background: #f3f4f6; color: #6b7280;
+        font-size: .95rem; flex-shrink: 0;
+        transition: all .2s ease;
+    }
+    .h5p-dropdown-option:hover .h5p-option-icon {
+        background: #89ba17; color: #fff;
+        transform: scale(1.08); box-shadow: 0 4px 12px rgba(137,186,23,.3);
+    }
+    .h5p-dropdown-option:hover .h5p-option-icon.floating-icon {
+        background: #2563eb; box-shadow: 0 4px 12px rgba(37,99,235,.3);
+    }
+    .h5p-option-text { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+    .h5p-option-title { font-size: .85rem; font-weight: 600; color: inherit; line-height: 1.3; }
+    .h5p-option-desc  { font-size: .72rem; color: #9ca3af; font-weight: 400; line-height: 1.3; }
+    .h5p-dropdown-option:hover .h5p-option-desc { color: #6b7280; }
 </style>
 
 
@@ -365,18 +742,29 @@
 
                 </a>
 
+                @if (!(User?.Identity?.IsAuthenticated ?? false))
+                {
+                    <a class="btn btn-link text-dark me-2 login-btn"
+                       asp-area="Identity" asp-page="/Account/Login"
+                       asp-route-returnUrl="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)"
+                       style="text-decoration: none; color: black;">
+                        <i class="bi bi-box-arrow-in-right" style="font-size: 18px; margin-right: 8px;" aria-hidden="true"></i>
+                        <span class="d-none d-sm-inline">Login</span>
+                    </a>
+                }
+
             </div>
         </div>
 
 
         <!-- 2) Green Navbar with Responsive Behavior -->
         <header>
-            <nav class="navbar navbar-expand-lg" style="background-color:#191919;" data-bs-theme="dark">
+            <nav class="navbar navbar-expand-lg" style="background-color: #191919;" data-bs-theme="dark">
                
                 <div class="container-fluid ps-3 ps-md-4 ">
 
-                    <a class="navbar-brand me-auto" href="https://www.promptcoach.xr-adiqu.de/">
-                        <img src="@Url.Content("~/logo-PromptCoach-transparenz.svg")" style="width:150px;height:100px" alt="App Logo" class="img-fluid" />
+                    <a class="navbar-brand me-auto ps-md-4 ps-lg-5" href="https://www.uni-wuppertal.de/de/">
+                        <img src="@Url.Content("~/logo-PromptCoach-transparenz.svg")" style="height: 90px; width: auto; margin: 0 8px 0 0;" alt="App Logo" class="img-fluid brand-logo" />
                     </a>
 
                     <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -474,11 +862,27 @@
         <!-- 2.5) Login Partial Row - Only show when logged in -->
         @if (SignInManager.IsSignedIn(User))
         {
-            <div class="border-top bg-dark border-bottom py-1 px-4 d-flex justify-content-end">
-                <div class="d-flex gap-3 align-items-center">
-                    <!-- Added flex container -->
-                    <partial name="_LoginPartial" />
+            var currentUser = await UserManager.GetUserAsync(User) as ProjectsWebApp.Models.AplicationUser;
+            var displayName = !string.IsNullOrWhiteSpace(currentUser?.Name)
+                ? currentUser!.Name
+                : (User.Identity?.Name ?? "Unbekannt");
+            string roleLabel =
+                User.IsInRole("SuperAdmin") ? "SuperAdmin" :
+                User.IsInRole("Admin")      ? "Admin"      :
+                                              "Studierend";
+
+            <div class="user-bar">
+                <div class="user-bar-status">
+                    <span class="user-bar-dot" aria-hidden="true"></span>
+                    <div class="user-bar-meta">
+                        <span class="user-bar-label">Angemeldet</span>
+                        <span class="user-bar-name">
+                            @displayName
+                            <span class="user-bar-role">@roleLabel</span>
+                        </span>
+                    </div>
                 </div>
+                <partial name="_LoginPartial" />
             </div>
         }
         <!-- 3) Thick subheader -->
@@ -584,14 +988,12 @@
             <div class="legal-links">
                 <a asp-area="User" asp-controller="Home" asp-action="Urheberrecht" style="color:white;font-size:16px; font-size:16px; font-weight: 500; margin: 0 1rem; text-decoration: none;">Urheberrecht</a>
                 <a asp-area="User" asp-controller="Home" asp-action="Impressum" style="color:white;font-size:16px; font-size:16px; font-weight: 500; margin: 0 1rem; text-decoration: none;">Impressum</a>
-                <a href="https://www.uni-wuppertal.de/de/datenschutz/" target="_blank" style="color:white;font-size:16px; font-size:16px; font-weight: 500; margin: 0 1rem; text-decoration: none;">
-                    Datenschutz
-                </a>
+                <a asp-area="User" asp-controller="Home" asp-action="Datenschutz" style="color:white;font-size:16px; font-size:16px; font-weight: 500; margin: 0 1rem; text-decoration: none;">Datenschutz</a>
             </div>
 
             <!-- Copyright -->
             <div class="footer-bottom text-light">
-                <p> &copy; @DateTime.Now.Year - Storyboard - ZIM: Medialab - ProviLe - Stiftung Innovation in der Hochschullehre.</p>
+                <p> &copy; @DateTime.Now.Year - Storyboard - ZIM: Medialab</p>
                 @* <p class="small">Software Development: Firas Alaammar | Concept: Dr. Heike Seehagen-Marx</p> *@
             </div>
         </div>
@@ -721,5 +1123,151 @@
     }
 
     @await RenderSectionAsync("Scripts", required: false)
+
+    @if (SignInManager.IsSignedIn(User))
+    {
+        <!-- H5P Floating Iframe Panel -->
+        <div id="h5pFloatingPanel" class="h5p-floating-panel" style="display:none;"
+             data-url="@(Url.Action("Gallery","H5P",new{area="User"}) + "?bare=1")">
+            <div class="h5p-floating-header" id="h5pFloatingHeader">
+                <div class="h5p-drag-indicator">
+                    <i class="bi bi-grip-vertical"></i>
+                    <span>Ziehen zum Bewegen</span>
+                </div>
+                <span class="h5p-floating-title">H5P-Inhalte</span>
+                <button type="button" class="h5p-floating-close" id="h5pFloatingClose"
+                        aria-label="Panel schließen" title="Schließen">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <iframe id="h5pFloatingIframe" class="h5p-floating-iframe"
+                    src="about:blank" title="H5P Gallery" loading="lazy" allow="fullscreen"></iframe>
+        </div>
+
+        <script>
+        (function() {
+            if (window !== window.top) return;
+
+            var panel   = document.getElementById('h5pFloatingPanel');
+            var header  = document.getElementById('h5pFloatingHeader');
+            var closeBtn= document.getElementById('h5pFloatingClose');
+            var iframe  = document.getElementById('h5pFloatingIframe');
+            if (!panel || !header || !closeBtn || !iframe) return;
+
+            var H5P_URL   = panel.getAttribute('data-url') || '/User/H5P/Gallery';
+            var STATE_KEY = 'h5p_floating_open';
+            var POS_KEY   = 'h5p_floating_pos';
+            var SIZE_KEY  = 'h5p_floating_size';
+
+            function applySavedPos() {
+                try {
+                    var p = JSON.parse(sessionStorage.getItem(POS_KEY) || 'null');
+                    if (p && typeof p.left === 'number' && typeof p.top === 'number') {
+                        panel.style.left = p.left + 'px';
+                        panel.style.top  = p.top  + 'px';
+                        panel.style.right = 'auto';
+                    }
+                } catch {}
+            }
+            function savePos() {
+                try {
+                    sessionStorage.setItem(POS_KEY, JSON.stringify({
+                        left: parseFloat(panel.style.left) || 0,
+                        top:  parseFloat(panel.style.top)  || 0
+                    }));
+                } catch {}
+            }
+            function applySavedSize() {
+                try {
+                    var s = JSON.parse(sessionStorage.getItem(SIZE_KEY) || 'null');
+                    if (s && s.width && s.height) {
+                        panel.style.width  = s.width  + 'px';
+                        panel.style.height = s.height + 'px';
+                    }
+                } catch {}
+            }
+            function saveSize() {
+                try {
+                    var r = panel.getBoundingClientRect();
+                    sessionStorage.setItem(SIZE_KEY, JSON.stringify({
+                        width:  Math.round(r.width),
+                        height: Math.round(r.height)
+                    }));
+                } catch {}
+            }
+            function openPanel() {
+                panel.style.display = 'flex';
+                if (!iframe.src || iframe.src === 'about:blank' || iframe.src === window.location.href) {
+                    iframe.src = H5P_URL;
+                }
+                applySavedPos(); applySavedSize();
+                try { sessionStorage.setItem(STATE_KEY, '1'); } catch {}
+            }
+            function closePanel() {
+                panel.style.display = 'none';
+                try { sessionStorage.setItem(STATE_KEY, '0'); } catch {}
+            }
+
+            closeBtn.addEventListener('click', closePanel);
+            window.addEventListener('h5p-floating-open', function() {
+                if (panel.style.display === 'none' || panel.style.display === '') openPanel();
+                else {
+                    panel.style.boxShadow = '0 0 0 3px #89ba17, 0 18px 40px rgba(16,24,40,.18)';
+                    setTimeout(function() { panel.style.boxShadow = ''; }, 600);
+                }
+            });
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && panel.style.display !== 'none' && panel.style.display !== '') closePanel();
+            });
+            if (window.ResizeObserver) {
+                new ResizeObserver(function() { if (panel.style.display !== 'none') saveSize(); }).observe(panel);
+            }
+
+            var dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+            function onDragStart(ev) {
+                if (ev.target.closest('button, a, .btn')) return;
+                dragging = true;
+                var pt = ('touches' in ev) ? ev.touches[0] : ev;
+                startX = pt.clientX; startY = pt.clientY;
+                var rect = panel.getBoundingClientRect();
+                panel.style.right = 'auto';
+                startLeft = parseFloat(panel.style.left) || rect.left;
+                startTop  = parseFloat(panel.style.top)  || rect.top;
+                iframe.style.pointerEvents = 'none';
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+                document.addEventListener('touchmove', onDragMove, { passive: false });
+                document.addEventListener('touchend', onDragEnd);
+                ev.preventDefault();
+            }
+            function onDragMove(ev) {
+                if (!dragging) return;
+                var pt = ('touches' in ev) ? ev.touches[0] : ev;
+                var dx = pt.clientX - startX, dy = pt.clientY - startY;
+                var vw = window.innerWidth,    vh = window.innerHeight;
+                var r  = panel.getBoundingClientRect();
+                var left = Math.min(Math.max(8, startLeft + dx), vw - r.width  - 8);
+                var top  = Math.min(Math.max(8, startTop  + dy), vh - r.height - 8);
+                panel.style.left = left + 'px';
+                panel.style.top  = top  + 'px';
+                if ('touches' in ev) ev.preventDefault();
+            }
+            function onDragEnd() {
+                if (!dragging) return;
+                dragging = false;
+                iframe.style.pointerEvents = '';
+                document.removeEventListener('mousemove', onDragMove);
+                document.removeEventListener('mouseup', onDragEnd);
+                document.removeEventListener('touchmove', onDragMove);
+                document.removeEventListener('touchend', onDragEnd);
+                savePos();
+            }
+            header.addEventListener('mousedown',  onDragStart);
+            header.addEventListener('touchstart', onDragStart, { passive: false });
+
+            try { if (sessionStorage.getItem(STATE_KEY) === '1') openPanel(); } catch {}
+        })();
+        </script>
+    }
 </body>
 </html>

@@ -733,10 +733,10 @@
             const f = imgIn.files && imgIn.files[0];
             if (!f) return;
 
-            // 2 MB size check
-            const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+            // 30 MB size check
+            const MAX_SIZE = 30 * 1024 * 1024; // 30 MB
             if (f.size > MAX_SIZE) {
-              const msg = 'Das Bild ist zu groß. Maximal 2 MB pro Bild erlaubt.';
+              const msg = 'Das Bild ist zu groß. Maximal 30 MB pro Bild erlaubt.';
               if (window.SB && SB.alert) SB.alert(msg, 'error', 'Bild zu groß');
               else if (window.Swal) Swal.fire({ icon: 'error', title: 'Bild zu groß', text: msg });
               else alert(msg);

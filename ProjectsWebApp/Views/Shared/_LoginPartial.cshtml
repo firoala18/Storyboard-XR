@@ -8,12 +8,42 @@
     }
 </style>
 
-<ul class="navbar-nav d-flex flex-row align-items-center gap-3">
+<ul class="navbar-nav user-bar-group d-flex flex-row align-items-center">
     @if (SignInManager.IsSignedIn(User))
     {
         var user = await UserManager.GetUserAsync(User) as AplicationUser;
 
-    
+        <!-- H5P-Inhalte Dropdown -->
+        <li class="nav-item" style="position:relative;">
+            <button type="button" id="h5pDropdownTrigger"
+                    class="user-bar-btn"
+                    data-tip="H5P-Inhalte" aria-expanded="false" aria-label="H5P-Inhalte öffnen">
+                <i class="bi bi-collection-play"></i>
+            </button>
+            <div class="h5p-dropdown" id="h5pDropdownMenu">
+                <div class="h5p-dropdown-header">
+                    <i class="bi bi-collection-play"></i> H5P-Inhalte öffnen
+                </div>
+                <div class="h5p-dropdown-body">
+                    <a class="h5p-dropdown-option" href="@Url.Action("Gallery","H5P",new{area="User"})" target="_blank" rel="noopener">
+                        <span class="h5p-option-icon"><i class="bi bi-box-arrow-up-right"></i></span>
+                        <span class="h5p-option-text">
+                            <span class="h5p-option-title">In neuem Tab</span>
+                            <span class="h5p-option-desc">Galerie in eigenem Browsertab öffnen</span>
+                        </span>
+                    </a>
+                    <a class="h5p-dropdown-option" href="#" id="h5pFloatingPanelOpen">
+                        <span class="h5p-option-icon floating-icon"><i class="bi bi-pip"></i></span>
+                        <span class="h5p-option-text">
+                            <span class="h5p-option-title">Floating-Panel</span>
+                            <span class="h5p-option-desc">Schwebendes Fenster beim Arbeiten</span>
+                        </span>
+                    </a>
+                </div>
+            </div>
+        </li>
+
+
 
         @* Für alle angemeldeten (auch Admins) zusätzlich: eigene Filter-Kategorien *@
         @* <li class="nav-item dropdown">
@@ -142,9 +172,10 @@
         @if (User.IsInRole(SD.Role_Admin))
         {
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle text-light d-flex align-items-center justify-content-center"
-                   href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-gear fs-4"></i>
+                <a class="user-bar-btn dropdown-toggle"
+                   href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                   data-tip="Admin" aria-label="Admin-Einstellungen">
+                    <i class="bi bi-gear"></i>
                 </a>
 
                 <ul class="dropdown-menu dropdown-menu-end admin-dropdown">
@@ -183,6 +214,14 @@
                         </a>
                     </li>
 
+                    <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">H5P-Managment</h6></li>
+                    <li>
+                        <a class="dropdown-item" asp-area="Admin" asp-controller="H5P" asp-action="Index">
+                            <i class="bi bi-collection-play me-2"></i> H5P-Inhalte
+                        </a>
+                    </li>
+
                    
                     <li><hr class="dropdown-divider"></li>
 
@@ -215,27 +254,60 @@
             </li>
         }
 
-            <!-- Manage Icon -->
+        <li class="nav-item d-flex align-items-center" aria-hidden="true">
+            <span class="user-bar-divider"></span>
+        </li>
+
+        <!-- Manage Icon -->
         <li class="nav-item">
-            <a id="manage" class="nav-link text-light d-flex align-items-center justify-content-center"
-               asp-area="Identity" asp-page="/Account/Manage/Index" title="Profil verwalten">
-                <i class="bi bi-person-circle fs-4"></i>
+            <a id="manage" class="user-bar-btn"
+               asp-area="Identity" asp-page="/Account/Manage/Index"
+               data-tip="Profil verwalten" aria-label="Profil verwalten">
+                <i class="bi bi-person-circle"></i>
             </a>
         </li>
         <!-- Logout Icon -->
         <li class="nav-item">
-            <form id="logoutForm" class="form-inline d-flex align-items-center justify-content-center"
+            <form id="logoutForm" class="d-inline"
                   asp-area="Identity" asp-page="/Account/Logout"
                   asp-route-returnUrl="@Url.Action("Home", "Home", new { area = "" })">
-                <button id="logout" type="submit" class="nav-link btn-link text-light border-0">
-                    <i class="bi bi-box-arrow-right fs-4"></i>
+                <button id="logout" type="submit" class="user-bar-btn danger"
+                        data-tip="Abmelden" aria-label="Abmelden">
+                    <i class="bi bi-box-arrow-right"></i>
                 </button>
             </form>
         </li>
     }
 </ul>
 
-  
-</ul>
+<script>
+(function() {
+    var trigger = document.getElementById('h5pDropdownTrigger');
+    var menu = document.getElementById('h5pDropdownMenu');
+    if (!trigger || !menu) return;
+
+    function openMenu()  { menu.classList.add('show');  trigger.setAttribute('aria-expanded','true');  trigger.classList.add('active'); }
+    function closeMenu() { menu.classList.remove('show'); trigger.setAttribute('aria-expanded','false'); trigger.classList.remove('active'); }
+
+    trigger.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        menu.classList.contains('show') ? closeMenu() : openMenu();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && menu.classList.contains('show')) closeMenu();
+    });
+    document.addEventListener('click', function(e) {
+        if (menu.classList.contains('show') && !menu.contains(e.target) && !trigger.contains(e.target)) closeMenu();
+    });
+
+    var floatBtn = document.getElementById('h5pFloatingPanelOpen');
+    if (floatBtn) {
+        floatBtn.addEventListener('click', function(e) {
+            e.preventDefault(); closeMenu();
+            window.dispatchEvent(new CustomEvent('h5p-floating-open'));
+        });
+    }
+})();
+</script>
 
 

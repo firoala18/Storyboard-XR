@@ -4,7 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using ProjectsWebApp.DataAccsess.Data;
 using ProjectsWebApp.Models;
+using ProjectsWebApp.Models.Dtos;
 using ProjectsWebApp.Hubs;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace ProjectsWebApp.Areas.User.Controllers
 {
@@ -275,8 +279,100 @@ namespace ProjectsWebApp.Areas.User.Controllers
             _context.Markers.Remove(m);
             await _context.SaveChangesAsync();
 
-            await _hub.Clients.Group($"scene-{sceneId}").SendAsync("MarkerDeleted", new { id, sceneId });
-            return NoContent();
+            // Renumber remaining markers so numbering stays contiguous (1..N).
+            var remaining = await _context.Markers
+                .Where(x => x.SceneId == sceneId)
+                .OrderBy(x => x.Number).ThenBy(x => x.Id)
+                .ToListAsync();
+            for (var i = 0; i < remaining.Count; i++)
+            {
+                var newNumber = i + 1;
+                if (remaining[i].Number != newNumber) remaining[i].Number = newNumber;
+            }
+            await _context.SaveChangesAsync();
+
+            var order = remaining.Select(x => new { id = x.Id, number = x.Number }).ToList();
+            await _hub.Clients.Group($"scene-{sceneId}").SendAsync("MarkerDeleted", new { id, sceneId, order });
+            return Ok(new { id, sceneId, order });
+        }
+
+        // ---- Authorization helpers (mirror ScenesController) ----
+        private const string AnonCookie = "sb_uid";
+        private static string EditCookieName(string slug) => $"sbedit_{slug}";
+
+        private static string Sha256Hex(string value)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
+        }
+
+        private bool IsStaff => User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+
+        private bool HasEditCookie(Storyboard sb)
+        {
+            if (string.IsNullOrWhiteSpace(sb.PublicId)) return false;
+            if (!Request.Cookies.TryGetValue(EditCookieName(sb.PublicId), out var k) || string.IsNullOrWhiteSpace(k))
+                return false;
+            return string.Equals(Sha256Hex(k), sb.EditKeyHash, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsOwnerByToken(Storyboard sb)
+        {
+            if (string.IsNullOrWhiteSpace(sb.OwnerTokenHash)) return false;
+            if (!Request.Cookies.TryGetValue(AnonCookie, out var token) || string.IsNullOrWhiteSpace(token))
+                return false;
+            return string.Equals(Sha256Hex(token), sb.OwnerTokenHash, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsOwnerByLogin(Storyboard sb)
+        {
+            var uid = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return !string.IsNullOrWhiteSpace(sb.OwnerId) && string.Equals(sb.OwnerId, uid, StringComparison.Ordinal);
+        }
+
+        private bool CanWrite(Storyboard sb) => IsStaff || IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasEditCookie(sb);
+
+        // PATCH /Markers/{id}
+        // Partial update for inline marker edits. null = leave unchanged.
+        // Uses a root-level route (leading '/') to override the class-level api prefix.
+        [AllowAnonymous]
+        [HttpPatch("/Markers/{id:int}")]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> Patch(int id, [FromBody] MarkerPatchDto dto)
+        {
+            if (dto == null) return BadRequest();
+
+            var m = await _context.Markers
+                .Include(x => x.Scene)
+                .ThenInclude(s => s!.Storyboard)
+                .FirstOrDefaultAsync(x => x.Id == id);
+            if (m == null) return NotFound();
+            if (m.Scene?.Storyboard == null) return NotFound();
+            if (!CanWrite(m.Scene.Storyboard)) return Forbid();
+
+            if (dto.RowVersion != null && m.RowVersion != null &&
+                !dto.RowVersion.SequenceEqual(m.RowVersion))
+            {
+                return Conflict(new { reason = "stale", rowVersion = m.RowVersion });
+            }
+
+            if (dto.X is not null) m.X = dto.X.Value;
+            if (dto.Y is not null) m.Y = dto.Y.Value;
+            if (dto.Number is not null) m.Number = dto.Number.Value;
+            if (dto.ColorHex is not null) m.ColorHex = dto.ColorHex;
+            if (dto.Description is not null) m.Description = dto.Description;
+            if (dto.Ziel is not null) m.Ziel = dto.Ziel;
+            if (dto.Datenablage is not null) m.Datenablage = dto.Datenablage;
+            if (dto.Quellen is not null) m.Quellen = dto.Quellen;
+            if (dto.PromptIdee is not null) m.PromptIdee = dto.PromptIdee;
+            if (dto.Reflexion is not null) m.Reflexion = dto.Reflexion;
+            if (dto.Model is not null) m.Model = dto.Model;
+            if (dto.Taxonomie is not null) m.Taxonomie = dto.Taxonomie;
+
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return Conflict(new { reason = "stale" }); }
+
+            return Ok(new { ok = true, rowVersion = m.RowVersion });
         }
     }
 }

@@ -1,0 +1,96 @@
+@model ProjectsWebApp.Models.Storyboard
+@using ProjectsWebApp.Models
+@{
+    var taxoChain = Model.Taxonomie.HasValue
+        ? Enumerable.Range(0, (int)Model.Taxonomie.Value + 1)
+            .Select(i => (int)i + 1 + ". " + ((TaxonomieStufe)i).ToString())
+            .ToList()
+        : new System.Collections.Generic.List<string>();
+    var paletteEntries = (Model.Farbpalette ?? "")
+        .Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries)
+        .Select(c => c.StartsWith("#") ? c : "#" + c)
+        .ToList();
+}
+
+<aside class="viewer-info-drawer" data-role="info-drawer" hidden aria-hidden="true">
+    <header class="viewer-info-head">
+        <h2>Storyboard-Info</h2>
+        <button type="button" class="viewer-info-close" data-action="close-info" aria-label="Info schließen">✕</button>
+    </header>
+    <div class="viewer-info-body">
+        <section class="viewer-info-field">
+            <label>Titel</label>
+            <div class="val">@Model.Title</div>
+        </section>
+        @if (!string.IsNullOrWhiteSpace(Model.Zielgruppe))
+        {
+            <section class="viewer-info-field">
+                <label>Zielgruppe</label>
+                <div class="val">@Model.Zielgruppe</div>
+            </section>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Lernziel))
+        {
+            <section class="viewer-info-field">
+                <label>Lernziel</label>
+                <div class="val richtext">@Html.Raw(Model.Lernziel)</div>
+            </section>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Beschreibung))
+        {
+            <section class="viewer-info-field">
+                <label>Beschreibung</label>
+                <div class="val richtext">@Html.Raw(Model.Beschreibung)</div>
+            </section>
+        }
+        @if (taxoChain.Count > 0)
+        {
+            <section class="viewer-info-field">
+                <label>Taxonomie</label>
+                <div class="viewer-info-taxo">
+                    @foreach (var t in taxoChain)
+                    {
+                        <span class="taxo-chip">@t</span>
+                    }
+                </div>
+            </section>
+        }
+        @if (paletteEntries.Count > 0)
+        {
+            <section class="viewer-info-field">
+                <label>Farbpalette</label>
+                <div class="viewer-info-palette">
+                    @foreach (var hex in paletteEntries)
+                    {
+                        <div class="swatch-wrap">
+                            <span class="swatch" style="background:@hex"></span>
+                            <span class="swatch-hex">@hex</span>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+        @if (Model.License.HasValue)
+        {
+            <section class="viewer-info-field">
+                <label>Lizenz</label>
+                <div class="val">@Model.License</div>
+            </section>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Authors))
+        {
+            <section class="viewer-info-field">
+                <label>Autoren</label>
+                <div class="val">@Model.Authors</div>
+            </section>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.LicenseExtras))
+        {
+            <section class="viewer-info-field">
+                <label>Lizenzzusätze</label>
+                <div class="val richtext">@Html.Raw(Model.LicenseExtras)</div>
+            </section>
+        }
+    </div>
+</aside>
+<div class="viewer-info-scrim" data-role="info-scrim" hidden></div>

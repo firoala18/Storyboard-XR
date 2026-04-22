@@ -1,18 +1,8 @@
-let dataTable1; // ✅ declare it globally
+﻿let dataTable1; // ✅ declare it globally
 const BASE_PATH = window.BASE_PATH || '/';
 const CSRF_TOKEN =
     document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
-// Normalize a possibly relative app path to include the PathBase
-function toAppUrl(p) {
-    if (!p) return '';
-    if (/^https?:\/\//i.test(p)) return p; // absolute URL
-    p = String(p).replace(/\\/g, '/');
-    if (p.startsWith('~/')) p = p.slice(2);
-    if (p.startsWith('/')) p = p.slice(1);
-    return BASE_PATH + p;
-}
 $(document).ready(function () {
-
     dataTable1 = $('#tblMakerSpace').DataTable({ // ✅ assign it here
       
         "ajax": {
@@ -25,9 +15,8 @@ $(document).ready(function () {
             {
                 data: 'imageUrl',
                 render: function (data) {
-                    const src = toAppUrl(data);
                     return `
-    <img src="${src}" style="width: 100px; height: 60px; object-fit: contain; background-color: #f9f9f9; border-radius: 6px;" />`;
+    <img src="${data}" style="width: 100px; height: 60px; object-fit: contain; background-color: #f9f9f9; border-radius: 6px;" />`;
                 },
                 width: "10%"
             },
@@ -114,13 +103,9 @@ $(document).ready(function () {
             {
                 data: 'id',
                 render: function (data) { // ✅ Single render function
-                    const base = (window.UPSERT_BASE && typeof window.UPSERT_BASE === 'string')
-                        ? window.UPSERT_BASE
-                        : (BASE_PATH + 'admin/makerspaceproject/upsert');
-                    const href = `${base}?id=${encodeURIComponent(data)}`;
                     return `
     <div class="d-flex justify-content-center">
-        <a href="${href}" class="btn btn-warning mx-2">
+        <a href="/promptcoach/admin/makerspaceproject/upsert?id=${data}" class="btn btn-warning mx-2">
             <i class="bi bi-pencil-square"></i>
         </a>
         <button class="btn btn-danger mx-2 delete-project" data-id="${data}">
@@ -157,7 +142,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url:  BASE_PATH + 'Admin/MakerSpaceProject/ToggleTop',
+            url:  '/promptcoach/Admin/MakerSpaceProject/ToggleTop',
             type: 'POST',
             data: { id: id, isTop: isChecked },
             success: function (response) {
@@ -176,7 +161,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url: BASE_PATH + 'Admin/MakerSpaceProject/ToggleForschung',
+            url: '/promptcoach/Admin/MakerSpaceProject/ToggleForschung',
             type: 'POST',
             data: { id: id, isForschung: isChecked },
             success: function (response) {
@@ -195,7 +180,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url: BASE_PATH + 'Admin/MakerSpaceProject/ToggleDownload',
+            url: '/promptcoach/Admin/MakerSpaceProject/ToggleDownload',
             type: 'POST',
             data: { id: id, isDownload: isChecked },
             success: function (response) {
@@ -214,7 +199,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url:  BASE_PATH + 'Admin/MakerSpaceProject/ToggleTutorial',
+            url:  '/promptcoach/Admin/MakerSpaceProject/ToggleTutorial',
             type: 'POST',
             data: { id: id, isTutorial: isChecked },
             success: function (response) {
@@ -233,7 +218,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url: BASE_PATH + 'Admin/MakerSpaceProject/ToggleNetzwerk',
+            url: '/promptcoach/Admin/MakerSpaceProject/ToggleNetzwerk',
             type: 'POST',
             data: { id: id, isNetzwerk: isChecked },
             success: function (response) {
@@ -253,7 +238,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url:  BASE_PATH + 'Admin/MakerSpaceProject/ToggleEvent',
+            url:  '/promptcoach/Admin/MakerSpaceProject/ToggleEvent',
             type: 'POST',
             data: { id: id, isEvent: isChecked },
             success: function (response) {
@@ -272,7 +257,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url: BASE_PATH + 'Admin/MakerSpaceProject/ToggleLesezeichen',
+            url: '/promptcoach/Admin/MakerSpaceProject/ToggleLesezeichen',
             type: 'POST',
             data: { id: id, isLesezeichen: isChecked },
             success: function (response) {
@@ -291,7 +276,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url: BASE_PATH + 'Admin/MakerSpaceProject/ToggleITRecht',
+            url: '/promptcoach/Admin/MakerSpaceProject/ToggleITRecht',
             type: 'POST',
             data: { id: id, isITRecht: isChecked },
             success: function (response) {
@@ -311,7 +296,7 @@ $(document).ready(function () {
         const isChecked = $(this).is(':checked');
 
         $.ajax({
-            url: BASE_PATH + 'Admin/MakerSpaceProject/ToggleBeitraege',
+            url: '/promptcoach/Admin/MakerSpaceProject/ToggleBeitraege',
             type: 'POST',
             data: { id: id, isBeitraege: isChecked },
             success: function (response) {

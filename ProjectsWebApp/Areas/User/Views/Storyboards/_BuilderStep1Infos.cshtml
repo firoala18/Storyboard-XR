@@ -81,13 +81,24 @@
             <div class="step1-palette" data-field="farbpalette">
                 @foreach (var c in colors)
                 {
-                    <span class="palette-chip" data-color="@c" style="background:@c" title="@c"></span>
+                    <span class="palette-chip" data-color="@c" style="background:@c" title="Rechtsklick / lange berühren zum Entfernen – @c"></span>
                 }
-                <label class="palette-add" title="Farbe hinzufügen">
-                    +
-                    <input type="color" class="palette-picker" />
-                </label>
+                <div class="palette-add-wrap" data-role="palette-add-wrap">
+                    <button type="button" class="palette-add" data-action="open-palette-popover" aria-haspopup="dialog" aria-expanded="false" title="Farbe hinzufügen">+</button>
+                    <div class="palette-popover" data-role="palette-popover" role="dialog" aria-label="Neue Farbe hinzufügen" hidden>
+                        <div class="palette-popover-head">Neue Farbe</div>
+                        <label class="palette-popover-swatch" title="Klicke zum Ändern">
+                            <input type="color" class="palette-picker" data-role="palette-picker" value="#89ba17" />
+                            <span class="palette-popover-swatch-label" data-role="palette-picker-label">#89ba17</span>
+                        </label>
+                        <div class="palette-popover-actions">
+                            <button type="button" class="btn-secondary" data-action="cancel-palette">Abbrechen</button>
+                            <button type="button" class="btn-primary-green" data-action="confirm-palette">Hinzufügen</button>
+                        </div>
+                    </div>
+                </div>
             </div>
+            <div class="palette-hint">Farben lassen sich per Rechtsklick (bzw. langem Tippen auf iPad) wieder entfernen.</div>
         </div>
 
         <div class="step1-card">
@@ -160,23 +171,63 @@
             const raw = sel.value;
             const value = raw === '' ? null : Number(raw);
             window.Builder.patchField('storyboard', sbId, field, value, { immediate: true });
+            if (field === 'taxonomie') {
+                window.dispatchEvent(new CustomEvent('builder:storyboard-taxonomie-changed', {
+                    detail: { value }
+                }));
+            }
         });
     });
 
     const palette = document.querySelector('.step1-palette');
-    const picker  = palette?.querySelector('.palette-picker');
+    const picker  = palette?.querySelector('[data-role="palette-picker"]');
+    const popover = palette?.querySelector('[data-role="palette-popover"]');
+    const pickerLabel = palette?.querySelector('[data-role="palette-picker-label"]');
+    const addWrap = palette?.querySelector('[data-role="palette-add-wrap"]');
+    const openBtn = palette?.querySelector('[data-action="open-palette-popover"]');
     function savePalette() {
         const vals = Array.from(palette.querySelectorAll('.palette-chip')).map(c => c.dataset.color).join(',');
         window.Builder.patchField('storyboard', sbId, 'farbpalette', vals, { immediate: true });
     }
-    // The <label class="palette-add"> contains the <input type="color">, so native
-    // click on the label already opens the picker anchored to the button's position.
+    function togglePopover(show) {
+        if (!popover) return;
+        popover.hidden = !show;
+        openBtn?.setAttribute('aria-expanded', show ? 'true' : 'false');
+        if (show) {
+            picker.value = '#89ba17';
+            if (pickerLabel) pickerLabel.textContent = '#89ba17';
+        }
+    }
+    openBtn?.addEventListener('click', ev => {
+        ev.stopPropagation();
+        togglePopover(popover.hidden);
+    });
+    picker?.addEventListener('input', () => {
+        if (pickerLabel) pickerLabel.textContent = picker.value;
+    });
     picker?.addEventListener('change', () => {
+        if (pickerLabel) pickerLabel.textContent = picker.value;
+    });
+    palette?.querySelector('[data-action="cancel-palette"]')?.addEventListener('click', () => togglePopover(false));
+    palette?.querySelector('[data-action="confirm-palette"]')?.addEventListener('click', () => {
+        const value = picker.value;
         const chip = document.createElement('span');
-        chip.className = 'palette-chip'; chip.dataset.color = picker.value;
-        chip.style.background = picker.value; chip.title = picker.value;
-        palette.insertBefore(chip, palette.querySelector('.palette-add'));
+        chip.className = 'palette-chip';
+        chip.dataset.color = value;
+        chip.style.background = value;
+        chip.title = 'Rechtsklick / lange berühren zum Entfernen – ' + value;
+        palette.insertBefore(chip, addWrap);
+        togglePopover(false);
         savePalette();
+    });
+    // Close the popover on outside click or Escape so users don't get stuck.
+    document.addEventListener('click', ev => {
+        if (!popover || popover.hidden) return;
+        if (addWrap && addWrap.contains(ev.target)) return;
+        togglePopover(false);
+    });
+    document.addEventListener('keydown', ev => {
+        if (ev.key === 'Escape' && popover && !popover.hidden) togglePopover(false);
     });
     palette?.addEventListener('contextmenu', ev => {
         const chip = ev.target.closest('.palette-chip');
@@ -184,6 +235,25 @@
         ev.preventDefault();
         chip.remove(); savePalette();
     });
+    // Long-press on touch devices (iPad) → remove chip, since right-click isn't available.
+    (function wireLongPressRemove(){
+        let pressTimer = null; let pressTarget = null;
+        palette?.addEventListener('touchstart', ev => {
+            const chip = ev.target.closest('.palette-chip');
+            if (!chip) return;
+            pressTarget = chip;
+            pressTimer = setTimeout(() => {
+                if (pressTarget && confirm('Farbe entfernen?')) {
+                    pressTarget.remove(); savePalette();
+                }
+                pressTimer = null; pressTarget = null;
+            }, 600);
+        }, { passive: true });
+        const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; pressTarget = null; } };
+        palette?.addEventListener('touchend', cancel);
+        palette?.addEventListener('touchcancel', cancel);
+        palette?.addEventListener('touchmove', cancel);
+    })();
 
     const authorsWrap = document.querySelector('.step1-authors');
     const authorInput = authorsWrap?.querySelector('.author-input');

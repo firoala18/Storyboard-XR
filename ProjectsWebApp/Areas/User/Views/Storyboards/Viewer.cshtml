@@ -6,8 +6,15 @@
     ViewBag.FullWidth = true;
 
     var coverPath = !string.IsNullOrWhiteSpace(Model.CoverImagePath) ? Model.CoverImagePath : Model.ImagePath;
+    // Also skip draft scenes with no image, no name, and no markers — they used
+    // to show up as blank pages in the exported PDF even when the author meant
+    // them as placeholders in Step 2.
     var scenes = (Model.Scenes ?? new List<Scene>())
         .Where(s => string.IsNullOrWhiteSpace(coverPath) || !string.Equals(s.ImagePath, coverPath, System.StringComparison.OrdinalIgnoreCase))
+        .Where(s =>
+            !string.IsNullOrWhiteSpace(s.ImagePath)
+            || !string.IsNullOrWhiteSpace(s.Name)
+            || (s.Markers?.Any() == true))
         .OrderBy(s => s.Number).ThenBy(s => s.Id).ToList();
     var activeId = (int?)ViewBag.ActiveSceneId ?? scenes.FirstOrDefault()?.Id ?? 0;
     var activeScene = scenes.FirstOrDefault(s => s.Id == activeId) ?? scenes.FirstOrDefault();

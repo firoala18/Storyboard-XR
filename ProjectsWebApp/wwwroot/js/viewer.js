@@ -855,14 +855,14 @@
                 return curY;
             }
 
-            // Header — always uni-green (#89ba17), independent of storyboard palette
+            // Header — always HSM black (#191919), independent of storyboard palette
             const headerH = 40;
             const titleOrig = meta.title;
-            pdf.setFillColor(137, 186, 23);
+            pdf.setFillColor(25, 25, 25);
             pdf.rect(0, 0, page.w, headerH, 'F');
 
             try {
-                const logo = await svgToPngDataUrl(`${PATH_BASE}/images/logo_header_white.svg`, 2000);
+                const logo = await svgToPngDataUrl(`${PATH_BASE}/logo-PromptCoach-transparenz.svg`, 2000);
                 const ratio = logo.h / logo.w;
                 const logoWmm = 70;
                 const logoHmm = logoWmm * ratio;
@@ -940,7 +940,7 @@
                     pdf.setTextColor(15, 23, 42);
                     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(17);
                     pdf.text(sceneLabel, innerX, yCursor + 6);
-                    pdf.setDrawColor(137, 186, 23); pdf.setLineWidth(0.8);
+                    pdf.setDrawColor(25, 25, 25); pdf.setLineWidth(0.8);
                     const slW = pdf.getTextWidth(sceneLabel);
                     pdf.line(innerX, yCursor + 8.4, innerX + slW, yCursor + 8.4);
                     yCursor += 14;
@@ -1038,7 +1038,7 @@
             const declTitle = 'Erklärung zur Freigabe unter Open-Source-Lizenz';
             pdf.setTextColor(15, 23, 42); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15);
             pdf.text(declTitle, margin, yDecl + 5);
-            pdf.setDrawColor(137, 186, 23); pdf.setLineWidth(0.8);
+            pdf.setDrawColor(25, 25, 25); pdf.setLineWidth(0.8);
             const declW = pdf.getTextWidth(declTitle);
             pdf.line(margin, yDecl + 7.4, margin + declW, yDecl + 7.4);
             yDecl += 14;
@@ -1075,17 +1075,36 @@
             yDecl += 6;
             pdf.setFont('helvetica', 'normal');
             const authors = Array.isArray(meta.authors) ? meta.authors : [];
+            // Safe bottom boundary for the declaration page (leaves room for the footer).
+            const declBottom = page.h - 16;
+            // Each author block = name line (19mm) + "Ort, Datum, Unterschrift" line (12mm).
+            const authorBlockH = 31;
+            const drawAuthorBlock = (nameText) => {
+                // Page break before we'd overrun the footer.
+                if (yDecl + authorBlockH > declBottom) {
+                    pdf.addPage();
+                    yDecl = margin + 6;
+                    // Repeat a compact "continuation" heading so the new page is readable.
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('Autor:in / Autor:innen (Fortsetzung):', margin, yDecl);
+                    yDecl += 8;
+                    pdf.setFont('helvetica', 'normal');
+                }
+                // Long names must wrap instead of flowing off the right margin.
+                const wrapped = pdf.splitTextToSize(nameText, page.w - margin * 2);
+                wrapped.forEach((ln, i) => {
+                    pdf.text(ln, margin, yDecl + (i * 5.2));
+                });
+                yDecl += Math.max(19, 5.2 * wrapped.length + 12);
+                pdf.text('Ort, Datum, Unterschrift', margin, yDecl); yDecl += 12;
+            };
             if (authors.length > 0) {
                 authors.forEach(name => {
                     const nm = String(name || '').trim();
-                    if (nm) { pdf.text(nm, margin, yDecl); yDecl += 19; }
-                    pdf.text('Ort, Datum, Unterschrift', margin, yDecl); yDecl += 12;
+                    drawAuthorBlock(nm || 'Name');
                 });
             } else {
-                for (let i = 0; i < 3; i++) {
-                    pdf.text('Name', margin, yDecl); yDecl += 19;
-                    pdf.text('Ort, Datum, Unterschrift', margin, yDecl); yDecl += 12;
-                }
+                for (let i = 0; i < 3; i++) drawAuthorBlock('Name');
             }
 
             const total = pdf.getNumberOfPages();
@@ -1127,21 +1146,107 @@
     });
 })();
 
-// ── Stage 12.3: Share link ────────────────────────────────────────────────────
+// ── Stage 12.3: Share popover ─────────────────────────────────────────────────
+// Mirrors the Step 3 (Vorschau & PDF) share card: readonly URL + copy button,
+// Viewer link, and (for owners) toggles for IsShared + AllowSharedEditing that
+// PATCH the storyboard. Any toggle reload is intentional — matches Step 3 so
+// SignalR / gating can re-attach cleanly.
 (function viewerShare() {
-    document.querySelectorAll('[data-action="copy-share"]').forEach(b =>
-        b.addEventListener('click', async () => {
-            const url = b.dataset.shareUrl;
-            if (!url) return;
-            try { await navigator.clipboard.writeText(url); flash(b, 'Kopiert ✓'); }
-            catch { prompt('Link kopieren:', url); }
-        }));
-    function flash(el, text) {
-        const orig = el.getAttribute('title') || '';
-        el.setAttribute('title', text);
-        el.classList.add('is-flashing');
-        setTimeout(() => { el.setAttribute('title', orig); el.classList.remove('is-flashing'); }, 1200);
+    const wrap = document.querySelector('[data-role="viewer-share"]');
+    if (!wrap) return;
+
+    const sbId = wrap.dataset.sbId;
+    const trigger = wrap.querySelector('[data-action="toggle-share"]');
+    const popover = wrap.querySelector('[data-role="share-popover"]');
+    const urlInput = wrap.querySelector('[data-role="share-url"]');
+    const copyBtn = wrap.querySelector('[data-action="copy-share-link"]');
+    const openLink = wrap.querySelector('[data-role="share-open"]');
+    const isSharedToggle = wrap.querySelector('[data-role="is-shared"]');
+    const allowEditToggle = wrap.querySelector('[data-role="allow-edit"]');
+    const statusEl = wrap.querySelector('[data-role="share-status"]');
+    const closeBtn = wrap.querySelector('[data-action="close-share"]');
+
+    function setStatus(msg, kind) {
+        if (!statusEl) return;
+        statusEl.textContent = msg || '';
+        statusEl.dataset.kind = kind || '';
     }
+
+    function togglePopover(show) {
+        popover.hidden = !show;
+        trigger.setAttribute('aria-expanded', show ? 'true' : 'false');
+        if (show) setStatus('', '');
+    }
+
+    trigger.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        togglePopover(popover.hidden);
+    });
+    closeBtn?.addEventListener('click', () => togglePopover(false));
+
+    document.addEventListener('click', (ev) => {
+        if (popover.hidden) return;
+        if (wrap.contains(ev.target)) return;
+        togglePopover(false);
+    });
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' && !popover.hidden) togglePopover(false);
+    });
+
+    copyBtn?.addEventListener('click', async () => {
+        if (!urlInput?.value || copyBtn.disabled) return;
+        const href = new URL(urlInput.value, window.location.origin).href;
+        try {
+            await navigator.clipboard.writeText(href);
+            setStatus('Link kopiert ✓', 'ok');
+        } catch {
+            urlInput.select();
+            try { document.execCommand('copy'); setStatus('Link kopiert ✓', 'ok'); }
+            catch { setStatus('Bitte manuell kopieren', 'err'); }
+        }
+        setTimeout(() => setStatus('', ''), 1500);
+    });
+
+    async function patchShare(body, okMsg, rollback) {
+        try {
+            setStatus('Speichert …', '');
+            const res = await fetch(window.apiUrl(`/Storyboards/${sbId}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) { rollback(); setStatus('Änderung fehlgeschlagen', 'err'); return; }
+            setStatus(okMsg, 'ok');
+            // Match Step 3: reload so SignalR / route gating reflects the new state.
+            setTimeout(() => location.reload(), 500);
+        } catch {
+            rollback();
+            setStatus('Änderung fehlgeschlagen', 'err');
+        }
+    }
+
+    isSharedToggle?.addEventListener('change', () => {
+        const enabled = isSharedToggle.checked;
+        isSharedToggle.disabled = true;
+        const body = enabled
+            ? { isShared: true }
+            : { isShared: false, allowSharedEditing: false };
+        patchShare(body, enabled ? 'Teilen aktiviert' : 'Teilen deaktiviert',
+            () => { isSharedToggle.checked = !enabled; isSharedToggle.disabled = false; });
+    });
+
+    allowEditToggle?.addEventListener('change', () => {
+        const enabled = allowEditToggle.checked;
+        if (enabled && !isSharedToggle?.checked) {
+            allowEditToggle.checked = false;
+            setStatus('Bitte zuerst „Teilen aktivieren"', 'err');
+            return;
+        }
+        allowEditToggle.disabled = true;
+        patchShare({ allowSharedEditing: enabled },
+            enabled ? 'Mitbearbeiten aktiviert' : 'Mitbearbeiten deaktiviert',
+            () => { allowEditToggle.checked = !enabled; allowEditToggle.disabled = false; });
+    });
 })();
 
 // ── Stage 12.4: Palette role mapping ─────────────────────────────────────────

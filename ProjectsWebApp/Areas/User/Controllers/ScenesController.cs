@@ -60,14 +60,30 @@ namespace ProjectsWebApp.Areas.User.Controllers
         private bool IsOwnerByLogin(Storyboard sb)
             => !string.IsNullOrWhiteSpace(sb.OwnerId) && string.Equals(sb.OwnerId, CurrentUserId, StringComparison.Ordinal);
 
-        private bool CanWrite(Storyboard sb) => IsStaff || IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasEditCookie(sb);
+        private bool IsAuthenticated => User.Identity?.IsAuthenticated == true;
+
+        private bool HasSharedEditAccess(Storyboard sb)
+        {
+            if (!sb.IsShared || !sb.AllowSharedEditing) return false;
+            if (!string.IsNullOrWhiteSpace(sb.OwnerId) && !IsAuthenticated) return false;
+            return true;
+        }
+
+        private bool CanWrite(Storyboard sb)
+            => IsStaff || IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasSharedEditAccess(sb);
 
         // POST: /User/Scenes/GenerateAiScene
         // Generate a new scene image via OpenAI (gpt-image-1) and create a Scene entry.
+        // TEMP: KI-Bildgenerierung vorerst deaktiviert (Admin und Nutzer). Endpoint gibt 503 zurück,
+        // die eigentliche Implementierung bleibt auskommentiert und kann später reaktiviert werden.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> GenerateAiScene(int storyboardId, string prompt, string? aspect, string? quality)
+        public Task<IActionResult> GenerateAiScene(int storyboardId, string prompt, string? aspect, string? quality)
         {
+            return Task.FromResult<IActionResult>(
+                StatusCode(503, new { error = "KI-Bildgenerierung ist derzeit deaktiviert." }));
+
+            /*
             var sb = await _context.Storyboards
                 .Include(s => s.Scenes)
                 .FirstOrDefaultAsync(s => s.Id == storyboardId);
@@ -219,6 +235,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 await _hub.Clients.Group($"sb-{storyboardId}").SendAsync("SceneDeleted", new { id = sc.Id, storyboardId });
                 return StatusCode(500, new { error = "Interner Fehler bei der Bildgenerierung." });
             }
+            */
         }
 
         // GET: /User/Scenes/Create?storyboardId=5
@@ -461,15 +478,26 @@ namespace ProjectsWebApp.Areas.User.Controllers
             _context.Scenes.Remove(scene);
             await _context.SaveChangesAsync();
 
-            // Realtime broadcast: scene deleted
-            await _hub.Clients.Group($"sb-{storyboardId}").SendAsync("SceneDeleted", new { id, storyboardId });
-
-            // pick next scene to open (if any)
-            var nextSceneId = await _context.Scenes
+            // Renumber remaining scenes so numbering stays contiguous (1..N).
+            // Matches the marker-delete behaviour — users expect "delete scene 2
+            // of {1,2,3}" to leave {1,2} behind, not {1,3}.
+            var remaining = await _context.Scenes
                 .Where(s => s.StoryboardId == storyboardId)
                 .OrderBy(s => s.Number).ThenBy(s => s.Id)
-                .Select(s => (int?)s.Id)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+            for (var i = 0; i < remaining.Count; i++)
+            {
+                var newNumber = i + 1;
+                if (remaining[i].Number != newNumber) remaining[i].Number = newNumber;
+            }
+            await _context.SaveChangesAsync();
+
+            // Realtime broadcast: scene deleted (+ new order)
+            var order = remaining.Select(s => new { id = s.Id, number = s.Number }).ToList();
+            await _hub.Clients.Group($"sb-{storyboardId}").SendAsync("SceneDeleted", new { id, storyboardId, order });
+
+            // pick next scene to open (if any)
+            var nextSceneId = remaining.Select(s => (int?)s.Id).FirstOrDefault();
 
             TempData["Info"] = "Szene wurde gelöscht.";
             if (!string.IsNullOrWhiteSpace(scene.Storyboard.PublicId))
@@ -523,6 +551,52 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 rowVersion = sc.RowVersion,
                 markers = Array.Empty<object>()
             });
+        }
+
+        // POST /Scenes/Reorder
+        // Accepts { storyboardId, sceneIds: [id, id, ...] } and renumbers the
+        // scenes in that order. Used by the Builder's drag-and-drop scene rail
+        // and by the touch reorder controls on iPad (where HTML5 DnD isn't
+        // reliable across browsers).
+        [AllowAnonymous]
+        [HttpPost("/Scenes/Reorder")]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> Reorder([FromBody] SceneReorderDto dto)
+        {
+            if (dto == null || dto.SceneIds == null || dto.SceneIds.Count == 0)
+                return BadRequest(new { message = "Keine Reihenfolge übergeben." });
+
+            var sb = await _context.Storyboards.FindAsync(dto.StoryboardId);
+            if (sb == null) return NotFound();
+            if (!CanWrite(sb)) return Forbid();
+
+            var scenes = await _context.Scenes
+                .Where(s => s.StoryboardId == dto.StoryboardId)
+                .ToListAsync();
+            var byId = scenes.ToDictionary(s => s.Id);
+
+            // Validate: every submitted id must belong to this storyboard.
+            if (dto.SceneIds.Any(id => !byId.ContainsKey(id)))
+                return BadRequest(new { message = "Unbekannte Szenen-ID in der Reihenfolge." });
+
+            for (var i = 0; i < dto.SceneIds.Count; i++)
+            {
+                var sc = byId[dto.SceneIds[i]];
+                var newNumber = i + 1;
+                if (sc.Number != newNumber) sc.Number = newNumber;
+            }
+            // Any scenes not in the submitted list (shouldn't happen, but guard
+            // against partial payloads) get appended at the end.
+            var submitted = new HashSet<int>(dto.SceneIds);
+            var trailing = scenes.Where(s => !submitted.Contains(s.Id)).OrderBy(s => s.Number).ThenBy(s => s.Id);
+            var next = dto.SceneIds.Count + 1;
+            foreach (var sc in trailing) { sc.Number = next++; }
+
+            await _context.SaveChangesAsync();
+
+            var order = scenes.OrderBy(s => s.Number).Select(s => new { id = s.Id, number = s.Number }).ToList();
+            await _hub.Clients.Group($"sb-{dto.StoryboardId}").SendAsync("ScenesReordered", new { storyboardId = dto.StoryboardId, order });
+            return Ok(new { order });
         }
 
         // POST /Scenes/UploadImage/{id}
@@ -634,6 +708,22 @@ namespace ProjectsWebApp.Areas.User.Controllers
 
             try { await _context.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException) { return Conflict(new { reason = "stale" }); }
+
+            var changes = new Dictionary<string, object?>();
+            if (dto.Name is not null) changes["name"] = scene.Name;
+            if (dto.Number is not null) changes["number"] = scene.Number;
+            if (dto.ImagePath is not null) changes["imagePath"] = scene.ImagePath;
+
+            if (changes.Count > 0 && scene.Storyboard.AllowSharedEditing)
+            {
+                await _hub.Clients.Group($"sb-{scene.StoryboardId}").SendAsync("SceneUpdated", new
+                {
+                    id = scene.Id,
+                    storyboardId = scene.StoryboardId,
+                    origin = HttpContext.Connection.Id,
+                    fields = changes
+                });
+            }
 
             return Ok(new { ok = true, rowVersion = scene.RowVersion });
         }

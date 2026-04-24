@@ -116,7 +116,7 @@
                 btn.type = 'button';
                 btn.className = 'marker-chip';
                 btn.dataset.markerId = String(m.id);
-                btn.style.background = m.colorHex || '#78a7ff';
+                btn.style.background = m.colorHex || '#89ba17';
                 btn.style.color = contrastText(m.colorHex);
                 btn.textContent = m.number;
                 btn.title = `Marker ${m.number}`;
@@ -132,7 +132,7 @@
                 dot.dataset.markerId = String(m.id);
                 dot.style.left = (m.x * 100).toFixed(3) + '%';
                 dot.style.top  = (m.y * 100).toFixed(3) + '%';
-                dot.style.background = m.colorHex || '#78a7ff';
+                dot.style.background = m.colorHex || '#89ba17';
                 dot.style.color = contrastText(m.colorHex);
                 dot.textContent = m.number;
                 dot.addEventListener('click', () => selectMarker(m.id));
@@ -170,7 +170,7 @@
         const badge = reader.querySelector('[data-role="reader-badge"]');
         if (badge) {
             badge.textContent = m.number;
-            badge.style.background = m.colorHex || '#78a7ff';
+            badge.style.background = m.colorHex || '#89ba17';
             badge.style.color = contrastText(m.colorHex);
         }
         const titleEl = reader.querySelector('[data-role="reader-title"]');

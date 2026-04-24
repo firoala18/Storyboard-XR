@@ -78,7 +78,33 @@ namespace ProjectsWebApp.Areas.User.Controllers
         private bool IsOwnerByLogin(Storyboard sb)
             => !string.IsNullOrWhiteSpace(sb.OwnerId) && string.Equals(sb.OwnerId, CurrentUserId, StringComparison.Ordinal);
 
-        private bool CanWrite(Storyboard sb) => IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasEditCookie(sb);
+        private bool IsAuthenticated => User.Identity?.IsAuthenticated == true;
+
+        // A shared (non-owner) visitor gets write access only when the owner
+        // has opted in via both IsShared (link is public) AND AllowSharedEditing
+        // (edits allowed). If the owner is authenticated, the visitor must also
+        // be authenticated — anonymous collaboration is not allowed on logged-in
+        // owners' boards.
+        private bool HasSharedEditAccess(Storyboard sb)
+        {
+            if (!sb.IsShared || !sb.AllowSharedEditing) return false;
+            if (!string.IsNullOrWhiteSpace(sb.OwnerId) && !IsAuthenticated) return false;
+            return true;
+        }
+
+        private bool CanWrite(Storyboard sb)
+            => IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasSharedEditAccess(sb);
+
+        // Whether a (non-owner) visitor is allowed to even see the storyboard.
+        // Owners always pass; everyone else needs IsShared = true and — when
+        // the owner is authenticated — the visitor must be too.
+        private bool CanAccessSharedBoard(Storyboard sb)
+        {
+            if (IsOwnerByLogin(sb) || IsOwnerByToken(sb)) return true;
+            if (!sb.IsShared) return false;
+            if (!string.IsNullOrWhiteSpace(sb.OwnerId) && !IsAuthenticated) return false;
+            return true;
+        }
 
         private static string NormalizePalette(string? raw)
         {
@@ -242,11 +268,31 @@ namespace ProjectsWebApp.Areas.User.Controllers
             return items.Length == 0 ? null : string.Join(", ", items);
         }
 
+        // When the storyboard's owner is authenticated but the visitor is not,
+        // we can't grant them access (per the shared-editing auth rule). Instead
+        // of a silent forbid / read-only fallback, show a clear prompt so they
+        // know to log in first.
+        private bool RequiresLoginGate(Storyboard sb)
+            => sb.IsShared
+               && !string.IsNullOrWhiteSpace(sb.OwnerId)
+               && !(User.Identity?.IsAuthenticated ?? false)
+               && !IsOwnerByToken(sb);
+
+        private IActionResult LoginRequiredView(string slug, string subPath)
+        {
+            var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
+            ViewBag.ReturnUrl = $"{pathBase}/s/{slug}{subPath}";
+            return View("~/Areas/User/Views/Storyboards/LoginRequired.cshtml");
+        }
+
         [HttpGet("{slug}")]
         public async Task<IActionResult> ViewBySlug(string slug, [FromQuery] string? k)
         {
             var sb = await FindBySlugAsync(slug, includeScenes: true, includeMarkers: true);
             if (sb == null) return NotFound();
+
+            if (RequiresLoginGate(sb)) return LoginRequiredView(slug, "");
+            if (!CanAccessSharedBoard(sb)) return NotFound();
 
             if (!string.IsNullOrWhiteSpace(k) &&
                 string.Equals(Sha256Hex(k), sb.EditKeyHash, StringComparison.OrdinalIgnoreCase))
@@ -267,6 +313,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 .FirstOrDefault();
 
             ViewBag.ActiveSceneId = activeSceneId;
+            ViewBag.IsOwner = IsOwnerByLogin(sb) || IsOwnerByToken(sb);
             ViewData["PublicSlug"] = slug;
             return View("~/Areas/User/Views/Storyboards/Viewer.cshtml", sb);
         }
@@ -277,18 +324,29 @@ namespace ProjectsWebApp.Areas.User.Controllers
             var sb = await FindBySlugAsync(slug, includeScenes: true, includeMarkers: true);
             if (sb == null) return NotFound();
 
+            if (RequiresLoginGate(sb)) return LoginRequiredView(slug, "/open");
+            if (!CanAccessSharedBoard(sb)) return NotFound();
+
+            var isStaff = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+            var isOwner = IsOwnerByLogin(sb) || IsOwnerByToken(sb) || isStaff;
+
+            // Non-owners only get the Builder when the owner has enabled
+            // shared editing. Otherwise send them to the read-only Viewer.
+            if (!isOwner && !sb.AllowSharedEditing)
+                return RedirectToAction(nameof(ViewBySlug), new { slug });
+
             ViewBag.ActiveSceneId = sb.Scenes?
                 .OrderBy(sc => sc.Number).ThenBy(sc => sc.Id)
                 .Select(sc => (int?)sc.Id).FirstOrDefault();
 
             ViewData["PublicSlug"] = slug;
 
-            var isStaff = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
             var canWrite = CanWrite(sb);
 
             ViewData["ReadOnly"] = !canWrite;
             ViewBag.IsStaff = isStaff;
             ViewBag.CanGenerateAi = canWrite || isStaff;
+            ViewBag.IsOwner = isOwner;
             ViewBag.InitialStep = 2;
             return View("~/Areas/User/Views/Storyboards/Builder.cshtml", sb);
         }
@@ -298,6 +356,14 @@ namespace ProjectsWebApp.Areas.User.Controllers
         {
             var sb = await FindBySlugAsync(slug, includeScenes: true, includeMarkers: true);
             if (sb == null) return NotFound();
+            if (RequiresLoginGate(sb)) return LoginRequiredView(slug, "/edit");
+            if (!CanAccessSharedBoard(sb)) return NotFound();
+            // Non-owner without collab-edit rights → bounce to the read-only Viewer
+            // rather than showing a raw 403.
+            var isOwner = IsOwnerByLogin(sb) || IsOwnerByToken(sb)
+                          || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+            if (!isOwner && !sb.AllowSharedEditing)
+                return RedirectToAction(nameof(ViewBySlug), new { slug });
             if (!CanWrite(sb)) return Forbid();
 
             ViewData["PublicSlug"] = slug;

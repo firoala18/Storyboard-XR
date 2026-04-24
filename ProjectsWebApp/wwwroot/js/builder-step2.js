@@ -139,7 +139,7 @@
             btn.type = 'button';
             btn.className = 'marker-mini';
             btn.textContent = m.number;
-            btn.style.background = m.colorHex || '#ef4444';
+            btn.style.background = m.colorHex || '#89ba17';
             btn.dataset.markerId = String(m.id);
             btn.title = `Marker ${m.number}`;
             if (m.id === activeMarkerId) btn.setAttribute('aria-selected', 'true');
@@ -159,7 +159,7 @@
         dot.className = 'marker-dot';
         dot.style.left = (m.x * 100) + '%';
         dot.style.top  = (m.y * 100) + '%';
-        dot.style.background = m.colorHex || '#ef4444';
+        dot.style.background = m.colorHex || '#89ba17';
         dot.textContent = m.number;
         dot.dataset.markerId = String(m.id);
         attachDrag(dot, m);
@@ -376,6 +376,8 @@
         if (res.ok) location.reload();
     });
 
+    // TEMP: AI-Generierung vorerst deaktiviert (für Admin und Nutzer)
+    /*
     document.querySelector('[data-action="generate-ai-scene"]')?.addEventListener('click', () => {
         const p = prompt('Bitte gib eine Szenenbeschreibung ein:');
         if (!p) return;
@@ -395,6 +397,7 @@
             else window.Builder?.setChip('error', '⚠ AI-Generierung fehlgeschlagen');
         });
     });
+    */
 
     document.querySelectorAll('.scene-thumb').forEach(li =>
         li.addEventListener('click', () => selectSceneFromThumb(li)));
@@ -410,6 +413,200 @@
         });
     }
     document.querySelectorAll('.scene-thumb-mini').forEach(wireSceneMini);
+
+    // ── Scene reorder via drag & drop (mouse + touch) ────────────────
+    // Uses Pointer Events so the same implementation drags on desktop mouse,
+    // stylus, and finger-touch (iPad). HTML5 Drag-and-Drop doesn't work on
+    // iOS Safari without a polyfill, so we roll our own lightweight version.
+    (function wireSceneReorder() {
+        if (!rail) return;
+        const LONG_PRESS_MS = 220;   // tablet: must distinguish from scroll/tap
+        const DRAG_THRESHOLD = 6;    // px the pointer must move to promote to drag
+
+        let pressTimer = null;
+        let dragging = null;         // { thumb, id, ghost, offsetY, startY, started }
+        let lastInsertBefore = null; // tracks hover target so we only mutate DOM when it changes
+
+        function renumberDom() {
+            const items = Array.from(rail.querySelectorAll('.scene-thumb'));
+            items.forEach((li, i) => {
+                const n = i + 1;
+                const numEl = li.querySelector('.scene-num');
+                if (numEl) numEl.textContent = String(n);
+                li.dataset.sceneNumber = String(n);
+            });
+            // Keep the compact mini rail in sync so the collapsed view isn't
+            // out of order while the server request is in flight.
+            const miniRail = document.querySelector('.scene-rail-compact');
+            if (miniRail) {
+                const byId = new Map(items.map((li, i) => [String(li.dataset.sceneId), i + 1]));
+                const minis = Array.from(miniRail.querySelectorAll('.scene-thumb-mini'));
+                minis.sort((a, b) => (byId.get(String(a.dataset.sceneId)) || 0) - (byId.get(String(b.dataset.sceneId)) || 0));
+                minis.forEach(m => {
+                    const n = byId.get(String(m.dataset.sceneId));
+                    if (n) {
+                        m.dataset.sceneNumber = String(n);
+                        const mn = m.querySelector('.scene-thumb-mini-num');
+                        if (mn) mn.textContent = String(n);
+                    }
+                    miniRail.appendChild(m);
+                });
+            }
+            // If the active scene got renumbered, refresh its badge.
+            if (activeScene) {
+                const activeThumb = rail.querySelector(`.scene-thumb[data-scene-id="${activeScene.id}"]`);
+                if (activeThumb) {
+                    const n = Number(activeThumb.dataset.sceneNumber);
+                    if (Number.isFinite(n)) {
+                        activeScene.number = n;
+                        if (activeNumEl) activeNumEl.textContent = String(n);
+                    }
+                }
+            }
+        }
+
+        async function persistOrder() {
+            const ids = Array.from(rail.querySelectorAll('.scene-thumb'))
+                .map(li => Number(li.dataset.sceneId))
+                .filter(Number.isFinite);
+            if (!ids.length) return;
+            window.Builder?.setChip('saving', 'Reihenfolge speichern…');
+            try {
+                const res = await fetch(window.apiUrl('/Scenes/Reorder'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': csrfToken()
+                    },
+                    body: JSON.stringify({ storyboardId, sceneIds: ids })
+                });
+                if (!res.ok) throw new Error('reorder-' + res.status);
+                window.Builder?.setChip('saved', 'Gespeichert vor 1 Sek.');
+            } catch (err) {
+                console.warn('reorder failed', err);
+                window.Builder?.setChip('error', '⚠ Reihenfolge nicht gespeichert');
+            }
+        }
+
+        function cancelLongPress() {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        }
+
+        function startDrag(thumb, ev) {
+            const rect = thumb.getBoundingClientRect();
+            const ghost = thumb.cloneNode(true);
+            ghost.classList.add('scene-thumb-ghost');
+            ghost.style.position = 'fixed';
+            ghost.style.left = rect.left + 'px';
+            ghost.style.top = rect.top + 'px';
+            ghost.style.width = rect.width + 'px';
+            ghost.style.pointerEvents = 'none';
+            ghost.style.zIndex = '2000';
+            ghost.style.opacity = '.9';
+            ghost.style.transform = 'rotate(-1.5deg) scale(1.02)';
+            ghost.style.boxShadow = '0 12px 28px rgba(15,23,42,.25)';
+            document.body.appendChild(ghost);
+
+            thumb.classList.add('scene-thumb-dragging');
+            dragging = {
+                thumb,
+                ghost,
+                id: Number(thumb.dataset.sceneId),
+                offsetY: ev.clientY - rect.top,
+                offsetX: ev.clientX - rect.left,
+                started: true
+            };
+        }
+
+        function onPointerMove(ev) {
+            if (!dragging) return;
+            ev.preventDefault();
+            const { ghost, offsetX, offsetY } = dragging;
+            ghost.style.left = (ev.clientX - offsetX) + 'px';
+            ghost.style.top  = (ev.clientY - offsetY) + 'px';
+
+            // Find which existing thumb the pointer is over and insert before/after it.
+            const items = Array.from(rail.querySelectorAll('.scene-thumb:not(.scene-thumb-dragging)'));
+            let insertBefore = null;
+            for (const li of items) {
+                const r = li.getBoundingClientRect();
+                if (ev.clientY < r.top + r.height / 2) { insertBefore = li; break; }
+            }
+            if (insertBefore !== lastInsertBefore) {
+                if (insertBefore) rail.insertBefore(dragging.thumb, insertBefore);
+                else rail.appendChild(dragging.thumb);
+                lastInsertBefore = insertBefore;
+            }
+        }
+
+        function endDrag(ev) {
+            cancelLongPress();
+            if (!dragging) return;
+            const { thumb, ghost } = dragging;
+            try { ghost.remove(); } catch {}
+            thumb.classList.remove('scene-thumb-dragging');
+            dragging = null;
+            lastInsertBefore = null;
+            renumberDom();
+            persistOrder();
+        }
+
+        rail.addEventListener('pointerdown', (ev) => {
+            const thumb = ev.target.closest('.scene-thumb');
+            if (!thumb) return;
+            // Don't start a drag on a secondary/right-click.
+            if (ev.button && ev.button !== 0) return;
+
+            const startX = ev.clientX, startY = ev.clientY;
+            cancelLongPress();
+            // On mouse: promote to drag as soon as the pointer moves >threshold.
+            // On touch/pen: wait for long-press so the user can still scroll the rail.
+            const isTouch = ev.pointerType === 'touch';
+            const promote = () => {
+                if (dragging) return;
+                startDrag(thumb, ev);
+                rail.setPointerCapture?.(ev.pointerId);
+            };
+            if (!isTouch) {
+                const onPreMove = (e) => {
+                    if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > DRAG_THRESHOLD) {
+                        promote();
+                        rail.removeEventListener('pointermove', onPreMove);
+                    }
+                };
+                rail.addEventListener('pointermove', onPreMove, { once: false });
+                const clearPre = () => rail.removeEventListener('pointermove', onPreMove);
+                rail.addEventListener('pointerup', clearPre, { once: true });
+                rail.addEventListener('pointercancel', clearPre, { once: true });
+            } else {
+                pressTimer = setTimeout(promote, LONG_PRESS_MS);
+                const cancelOnMove = (e) => {
+                    if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > DRAG_THRESHOLD) {
+                        // Moved before the long-press fired → treat as scroll,
+                        // not as a drag; the click handler will still fire.
+                        cancelLongPress();
+                        rail.removeEventListener('pointermove', cancelOnMove);
+                    }
+                };
+                rail.addEventListener('pointermove', cancelOnMove);
+                const cleanup = () => {
+                    rail.removeEventListener('pointermove', cancelOnMove);
+                    cancelLongPress();
+                };
+                rail.addEventListener('pointerup', cleanup, { once: true });
+                rail.addEventListener('pointercancel', cleanup, { once: true });
+            }
+        });
+
+        rail.addEventListener('pointermove', onPointerMove);
+        rail.addEventListener('pointerup', endDrag);
+        rail.addEventListener('pointercancel', endDrag);
+
+        // Prevent the rail from scrolling while actively dragging a thumb on touch.
+        rail.addEventListener('touchmove', (ev) => {
+            if (dragging) ev.preventDefault();
+        }, { passive: false });
+    })();
 
     window.addEventListener('builder:step-changed', (ev) => {
         if (ev.detail.step !== 2) return;
@@ -520,6 +717,9 @@
 
         const panelEl = document.querySelector('.step2-marker-panel');
 
+        // Minimum top (below the BUW site navbar + subheader) so the panel is
+        // never stranded behind the sticky header after a drag or a layout change.
+        const FLOAT_MIN_TOP = 240;
         function clampFloatState(state) {
             // Discard obviously bad persisted coordinates so a stale value can't
             // strand the panel off-screen.
@@ -528,19 +728,23 @@
             if (!isNum(state.floatW) || state.floatW < 240 || state.floatW > vw) delete state.floatW;
             if (!isNum(state.floatH) || state.floatH < 200 || state.floatH > vh) delete state.floatH;
             const w = state.floatW || 360;
-            const h = state.floatH || Math.round(vh * 0.72);
+            const h = state.floatH || Math.round(vh * 0.60);
             if (!isNum(state.floatLeft) || state.floatLeft < 0 || state.floatLeft > vw - 80) delete state.floatLeft;
-            if (!isNum(state.floatTop)  || state.floatTop  < 0 || state.floatTop  > vh - 80) delete state.floatTop;
+            if (!isNum(state.floatTop)  || state.floatTop  < FLOAT_MIN_TOP || state.floatTop  > vh - 80) delete state.floatTop;
             // If width/height would overflow, clamp to viewport-ish.
             if (state.floatLeft != null && state.floatLeft + w > vw) state.floatLeft = Math.max(8, vw - w - 8);
-            if (state.floatTop  != null && state.floatTop  + h > vh) state.floatTop  = Math.max(8, vh - h - 8);
+            if (state.floatTop  != null && state.floatTop  + h > vh) state.floatTop  = Math.max(FLOAT_MIN_TOP, vh - h - 8);
         }
 
         const VALID_MODES = ['docked', 'floating', 'below'];
         function normalizeMode(s) {
             if (VALID_MODES.includes(s.panelMode)) return s.panelMode;
-            // Legacy: panelFloating boolean -> 'floating' | 'docked'
-            return s.panelFloating ? 'floating' : 'docked';
+            // Legacy: a saved `panelFloating=true` still wins so nobody who
+            // explicitly chose "Schwebend" gets reset. Otherwise default to
+            // 'below' — students (mostly on iPad) told us the side-dock
+            // squeezes the canvas; 'below' keeps the image wide.
+            if (s.panelFloating === true) return 'floating';
+            return 'below';
         }
 
         function apply(state) {
@@ -655,7 +859,9 @@
 
                 function move(e) {
                     const nx = Math.max(8, Math.min(window.innerWidth - rect.width - 8, startLeft + (e.clientX - startX)));
-                    const ny = Math.max(8, Math.min(window.innerHeight - rect.height - 8, startTop + (e.clientY - startY)));
+                    // Lower bound = FLOAT_MIN_TOP so the panel can never be dragged
+                    // behind the sticky site navbar.
+                    const ny = Math.max(FLOAT_MIN_TOP, Math.min(window.innerHeight - rect.height - 8, startTop + (e.clientY - startY)));
                     grid.style.setProperty('--panel-float-left', nx + 'px');
                     grid.style.setProperty('--panel-float-right', 'auto');
                     grid.style.setProperty('--panel-float-top', ny + 'px');
@@ -749,4 +955,11 @@
         document.querySelectorAll('[data-action="panel-height-dec"]').forEach(b =>
             b.addEventListener('click', () => adjustBelowHeight(-HEIGHT_STEP)));
     })();
+
+    // Minimal external surface used by the SignalR collaboration layer to
+    // reflect changes made by remote editors (see builder-signalr.js).
+    window.Step2 = {
+        getActiveSceneId: () => activeScene?.id ?? null,
+        reloadActiveScene: () => { if (activeScene) loadScene(activeScene.id); }
+    };
 })();

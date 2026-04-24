@@ -113,7 +113,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 X = Math.Clamp(dto.X, 0, 1),
                 Y = Math.Clamp(dto.Y, 0, 1),
                 Number = nextNumber + 1,
-                ColorHex = string.IsNullOrWhiteSpace(dto.ColorHex) ? "#78a7ff" : dto.ColorHex.Trim(),
+                ColorHex = string.IsNullOrWhiteSpace(dto.ColorHex) ? "#89ba17" : dto.ColorHex.Trim(),
                 Taxonomie = scene.Storyboard?.Taxonomie // default marker level to storyboard's max (can be lowered later)
             };
 
@@ -330,7 +330,17 @@ namespace ProjectsWebApp.Areas.User.Controllers
             return !string.IsNullOrWhiteSpace(sb.OwnerId) && string.Equals(sb.OwnerId, uid, StringComparison.Ordinal);
         }
 
-        private bool CanWrite(Storyboard sb) => IsStaff || IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasEditCookie(sb);
+        private bool IsAuthenticated => User?.Identity?.IsAuthenticated == true;
+
+        private bool HasSharedEditAccess(Storyboard sb)
+        {
+            if (!sb.IsShared || !sb.AllowSharedEditing) return false;
+            if (!string.IsNullOrWhiteSpace(sb.OwnerId) && !IsAuthenticated) return false;
+            return true;
+        }
+
+        private bool CanWrite(Storyboard sb)
+            => IsStaff || IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasSharedEditAccess(sb);
 
         // PATCH /Markers/{id}
         // Partial update for inline marker edits. null = leave unchanged.
@@ -371,6 +381,31 @@ namespace ProjectsWebApp.Areas.User.Controllers
 
             try { await _context.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException) { return Conflict(new { reason = "stale" }); }
+
+            var changes = new Dictionary<string, object?>();
+            if (dto.X is not null) changes["x"] = m.X;
+            if (dto.Y is not null) changes["y"] = m.Y;
+            if (dto.Number is not null) changes["number"] = m.Number;
+            if (dto.ColorHex is not null) changes["colorHex"] = m.ColorHex;
+            if (dto.Description is not null) changes["description"] = m.Description;
+            if (dto.Ziel is not null) changes["ziel"] = m.Ziel;
+            if (dto.Datenablage is not null) changes["datenablage"] = m.Datenablage;
+            if (dto.Quellen is not null) changes["quellen"] = m.Quellen;
+            if (dto.PromptIdee is not null) changes["promptIdee"] = m.PromptIdee;
+            if (dto.Reflexion is not null) changes["reflexion"] = m.Reflexion;
+            if (dto.Model is not null) changes["model"] = m.Model;
+            if (dto.Taxonomie is not null) changes["taxonomie"] = (int?)m.Taxonomie;
+
+            if (changes.Count > 0 && m.Scene.Storyboard.AllowSharedEditing)
+            {
+                await _hub.Clients.Group($"scene-{m.SceneId}").SendAsync("MarkerPatched", new
+                {
+                    id = m.Id,
+                    sceneId = m.SceneId,
+                    origin = HttpContext.Connection.Id,
+                    fields = changes
+                });
+            }
 
             return Ok(new { ok = true, rowVersion = m.RowVersion });
         }

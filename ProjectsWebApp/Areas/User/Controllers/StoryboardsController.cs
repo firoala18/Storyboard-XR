@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using ProjectsWebApp.DataAccsess.Data;
+using ProjectsWebApp.Hubs;
 using ProjectsWebApp.Models;
 using ProjectsWebApp.Models.Dtos;
 using ProjectsWebApp.Utility;
@@ -19,15 +21,18 @@ namespace ProjectsWebApp.Areas.User.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly UserManager<IdentityUser> _userManager;
+        private readonly IHubContext<StoryboardHub> _hub;
 
         public StoryboardsController(
             ApplicationDbContext context,
             IWebHostEnvironment env,
-            UserManager<IdentityUser> userManager)
+            UserManager<IdentityUser> userManager,
+            IHubContext<StoryboardHub> hub)
         {
             _context = context;
             _env = env;
             _userManager = userManager;
+            _hub = hub;
         }
 
         private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -136,6 +141,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
 
             ViewBag.Token = t;
             ViewBag.InitialStep = step is >= 1 and <= 3 ? step : 1;
+            ViewBag.IsOwner = IsOwner(sb) || IsStaff;
             return View("Builder", sb);
         }
 
@@ -301,7 +307,19 @@ namespace ProjectsWebApp.Areas.User.Controllers
         private bool IsOwnerByLogin(Storyboard sb)
             => !string.IsNullOrWhiteSpace(sb.OwnerId) && string.Equals(sb.OwnerId, CurrentUserId, StringComparison.Ordinal);
 
-        private bool CanWrite(Storyboard sb) => IsStaff || IsOwnerByLogin(sb) || IsOwnerByToken(sb) || HasEditCookie(sb);
+        private bool IsAuthenticated => User.Identity?.IsAuthenticated == true;
+
+        private bool HasSharedEditAccess(Storyboard sb)
+        {
+            if (!sb.IsShared || !sb.AllowSharedEditing) return false;
+            if (!string.IsNullOrWhiteSpace(sb.OwnerId) && !IsAuthenticated) return false;
+            return true;
+        }
+
+        private bool IsOwner(Storyboard sb) => IsOwnerByLogin(sb) || IsOwnerByToken(sb);
+
+        private bool CanWrite(Storyboard sb)
+            => IsStaff || IsOwner(sb) || HasSharedEditAccess(sb);
 
         // Normalize a free-form list of authors into a comma-separated single string
         public static string? NormalizeAuthors(string? raw)
@@ -444,6 +462,7 @@ namespace ProjectsWebApp.Areas.User.Controllers
 
             ViewBag.ActiveSceneId = activeSceneId;
             ViewBag.Token = t; // so the view can pass it to /api endpoints
+            ViewBag.IsOwner = isOwner || IsSuper;
             return View(sb);
         }
 
@@ -526,10 +545,52 @@ namespace ProjectsWebApp.Areas.User.Controllers
             if (dto.Authors is not null) sb.Authors = dto.Authors;
             if (dto.CoverImagePath is not null) sb.CoverImagePath = dto.CoverImagePath;
 
+            // Toggling sharing/edit permission is owner-only. Collaborators
+            // holding write access (via the toggle itself) must not be able to
+            // revoke or alter it, so we enforce IsOwner explicitly here.
+            // Disabling IsShared cascades to AllowSharedEditing — you can't have
+            // shared editing on a board that isn't even shared.
+            if (dto.IsShared is not null)
+            {
+                if (!IsStaff && !IsOwner(sb)) return Forbid();
+                sb.IsShared = dto.IsShared.Value;
+                if (!sb.IsShared) sb.AllowSharedEditing = false;
+            }
+            if (dto.AllowSharedEditing is not null)
+            {
+                if (!IsStaff && !IsOwner(sb)) return Forbid();
+                // Enabling collab-edit requires the board to be shared first.
+                sb.AllowSharedEditing = dto.AllowSharedEditing.Value && sb.IsShared;
+            }
+
             sb.LastSeenAt = DateTime.UtcNow;
 
             try { await _context.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException) { return Conflict(new { reason = "stale" }); }
+
+            var changes = new Dictionary<string, object?>();
+            if (dto.Title is not null) changes["title"] = sb.Title;
+            if (dto.Zielgruppe is not null) changes["zielgruppe"] = sb.Zielgruppe;
+            if (dto.Beschreibung is not null) changes["beschreibung"] = sb.Beschreibung;
+            if (dto.Lernziel is not null) changes["lernziel"] = sb.Lernziel;
+            if (dto.Farbpalette is not null) changes["farbpalette"] = sb.Farbpalette;
+            if (dto.Taxonomie is not null) changes["taxonomie"] = (int)sb.Taxonomie!;
+            if (dto.License is not null) changes["license"] = (int?)sb.License;
+            if (dto.LicenseExtras is not null) changes["licenseExtras"] = sb.LicenseExtras;
+            if (dto.Authors is not null) changes["authors"] = sb.Authors;
+            if (dto.CoverImagePath is not null) changes["coverImagePath"] = sb.CoverImagePath;
+            if (dto.IsShared is not null) changes["isShared"] = sb.IsShared;
+            if (dto.AllowSharedEditing is not null) changes["allowSharedEditing"] = sb.AllowSharedEditing;
+
+            if (changes.Count > 0 && sb.AllowSharedEditing)
+            {
+                await _hub.Clients.Group($"sb-{id}").SendAsync("StoryboardUpdated", new
+                {
+                    id,
+                    origin = HttpContext.Connection.Id,
+                    fields = changes
+                });
+            }
 
             return Ok(new { ok = true, lastSavedAt = DateTime.UtcNow, rowVersion = sb.RowVersion });
         }

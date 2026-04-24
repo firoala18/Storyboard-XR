@@ -16,9 +16,12 @@
     var isPublic = !string.IsNullOrWhiteSpace(publicSlug);
     var readOnly = (ViewData["ReadOnly"] is bool b) ? b : false;
 
-    // Rollen direkt im View prüfen: nur authentifizierte Admin/SuperAdmin dürfen KI-Bilder erzeugen
+    // TEMP: KI-Bildgenerierung vorerst komplett deaktiviert (Admin und Nutzer).
+    // Der ursprüngliche Rollen-Check bleibt auskommentiert, damit er später einfach reaktiviert werden kann.
+    // `isAuthenticated` wird weiter unten im View noch benötigt und muss daher definiert bleiben.
     bool canGenerateAi = false;
     var isAuthenticated = User?.Identity?.IsAuthenticated ?? false;
+    /*
     if (isAuthenticated)
     {
         var user = await UserManager.GetUserAsync(User);
@@ -31,6 +34,7 @@
             }
         }
     }
+    */
 
     var basePath = Context.Request.PathBase.HasValue ? Context.Request.PathBase.Value : "";
 

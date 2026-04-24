@@ -15,10 +15,17 @@
         </header>
 
         <div class="step2-aside-body step2-aside-expanded">
+            <div class="scene-rail-hint" aria-hidden="true">
+                <svg viewBox="0 0 10 16" width="10" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="3" r="1.3"/><circle cx="8" cy="3" r="1.3"/><circle cx="2" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="2" cy="13" r="1.3"/><circle cx="8" cy="13" r="1.3"/></svg>
+                <span>Ziehen zum Sortieren</span>
+            </div>
             <ul class="scene-rail" data-storyboard-id="@Model.Id">
                 @foreach (var sc in scenes)
                 {
                     <li class="scene-thumb" data-scene-id="@sc.Id" data-scene-number="@sc.Number">
+                        <span class="scene-drag-handle" aria-hidden="true" title="Ziehen zum Sortieren">
+                            <svg viewBox="0 0 10 16" width="10" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="3" r="1.3"/><circle cx="8" cy="3" r="1.3"/><circle cx="2" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="2" cy="13" r="1.3"/><circle cx="8" cy="13" r="1.3"/></svg>
+                        </span>
                         <span class="scene-num">@sc.Number</span>
                         <div class="scene-thumb-img">
                             @if (!string.IsNullOrWhiteSpace(sc.ImagePath))
@@ -32,8 +39,9 @@
             </ul>
 
             <div class="scene-rail-actions">
-                <button type="button" class="btn-secondary" data-action="add-scene">+ Szene hinzufügen</button>
-                <button type="button" class="btn-primary-green" data-action="generate-ai-scene">✨ AI-Szene generieren</button>
+                <button type="button" class="btn-primary-green scene-add-btn" data-action="add-scene">+ Szene hinzufügen</button>
+                @* TEMP: AI-Generierung vorerst deaktiviert (für Admin und Nutzer) *@
+                @*<button type="button" class="btn-primary-green" data-action="generate-ai-scene">✨ AI-Szene generieren</button>*@
             </div>
         </div>
 
@@ -76,7 +84,7 @@
                     <button type="button" class="step2-zoom-btn" data-action="zoom-in" aria-label="Vergrößern">+</button>
                     <button type="button" class="step2-zoom-btn" data-action="zoom-reset" aria-label="Ansicht zurücksetzen" title="Ansicht zurücksetzen">⌾</button>
                 </div>
-                <button type="button" class="btn-secondary" data-action="replace-scene-image" data-role="scene-image-btn">↑ Bild hochladen</button>
+                <button type="button" class="btn-primary-green scene-upload-btn" data-action="replace-scene-image" data-role="scene-image-btn">↑ Bild hochladen</button>
                 <input type="file" accept="image/*" hidden data-input="replace-scene-image" />
                 <button type="button" class="btn-danger" data-action="delete-scene">🗑 Löschen</button>
             </div>

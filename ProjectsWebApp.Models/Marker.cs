@@ -16,7 +16,7 @@ namespace ProjectsWebApp.Models
         [Range(0, 1)] public double Y { get; set; }
 
         public int Number { get; set; }
-        [MaxLength(9)] public string ColorHex { get; set; } = "#78a7ff";
+        [MaxLength(9)] public string ColorHex { get; set; } = "#89ba17";
 
         // Rich-text HTML (TinyMCE) — unbounded so long/formatted content
         // doesn't blow past a varchar limit and produce a 500 on save.

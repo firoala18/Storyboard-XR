@@ -763,12 +763,12 @@ body:has(.builder-main) .breadcrumb, body:has(.builder-main) nav[aria-label="bre
 .step1-cover-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--uni-green); font-weight: 600; }
 .step1-cover-btn { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.55); color:#fff; border:0; border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer; }
 .step1-hero .field-label {
-    font-size: 14px;
+    font-size: 20px;
     color: #0f172a;
     font-weight: 700;
     text-transform: none;
     letter-spacing: 0;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 .step1-hero .step1-description { font-size: 15px; }
 /* Default affordance: subtle dashed border + hover highlight so users see these are inline-editable.
@@ -793,12 +793,12 @@ body:has(.builder-main) .breadcrumb, body:has(.builder-main) nav[aria-label="bre
 .step1-stack { display:flex; flex-direction:column; gap:18px; margin-top:18px; }
 .step1-card { background:#fff; border-radius:14px; padding:20px 22px; box-shadow: 0 1px 3px rgba(15,23,42,0.04); }
 .step1-stack .field-label {
-    font-size: 14px;
+    font-size: 20px;
     color: #0f172a;
     font-weight: 700;
     text-transform: none;
     letter-spacing: 0;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 .step1-stack .step1-input,
 .step1-stack .step1-select,
@@ -982,21 +982,53 @@ select.marker-taxo option { color: #0f172a; background: #fff; padding: 10px; fon
 .step1-licenseextras { width:100%; margin-top:8px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; font:inherit; resize:vertical; min-height:50px; }
 
 .step1-palette { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.palette-chip { width:26px; height:26px; border-radius:6px; border:1px solid rgba(0,0,0,0.08); cursor:pointer; }
+.palette-chip { width:28px; height:28px; border-radius:6px; border:1px solid rgba(0,0,0,0.08); cursor:pointer; }
+.palette-add-wrap { position:relative; }
 .palette-add  {
-    position:relative;
-    width:26px; height:26px; border-radius:6px;
+    width:28px; height:28px; border-radius:6px;
     border:1px dashed #cbd5e1; background:#fff; cursor:pointer;
     display:inline-flex; align-items:center; justify-content:center;
-    color:#64748b; font-weight:700; font-size:14px; line-height:1;
-    overflow:hidden;
+    color:#64748b; font-weight:700; font-size:16px; line-height:1;
+    transition: background .15s, border-color .15s, color .15s;
 }
-.palette-add:hover { background:var(--uni-green-50); color:var(--uni-green); border-color:var(--uni-green-400); }
-.palette-picker {
-    /* overlay the full button so the OS picker opens anchored to it */
-    position:absolute; inset:0; width:100%; height:100%;
-    opacity:0; cursor:pointer; border:0; padding:0; background:transparent;
+.palette-add:hover, .palette-add[aria-expanded="true"] {
+    background:var(--uni-green-50); color:var(--uni-green-700);
+    border-color:var(--uni-green-400); border-style: solid;
 }
+.palette-hint { margin-top:8px; font-size:11px; color:#64748b; }
+
+/* Popover-style color picker with explicit Add / Cancel actions so the
+   "wie bestätige ich?"-moment is eliminated on iPad where the native
+   <input type="color"> has no obvious done-button. */
+.palette-popover {
+    position: absolute; top: calc(100% + 8px); left: 0;
+    z-index: 20;
+    min-width: 220px;
+    background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+    box-shadow: 0 12px 24px rgba(15,23,42,0.12);
+    padding:12px; display:flex; flex-direction:column; gap:10px;
+}
+.palette-popover[hidden] { display:none; }
+.palette-popover-head { font-size:12px; font-weight:700; color:#334155; text-transform:uppercase; letter-spacing:.04em; }
+.palette-popover-swatch {
+    position:relative; display:flex; align-items:center; gap:10px;
+    padding:8px; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer;
+    transition: border-color .15s;
+}
+.palette-popover-swatch:hover { border-color: var(--uni-green-400); }
+.palette-popover-swatch .palette-picker {
+    width:44px; height:44px; border:1px solid #e2e8f0; border-radius:6px;
+    padding:0; cursor:pointer; background:#fff;
+}
+/* Hide the color input's inner swatch padding on WebKit/Blink so the
+   displayed color fills the control. */
+.palette-popover-swatch .palette-picker::-webkit-color-swatch-wrapper { padding:2px; }
+.palette-popover-swatch .palette-picker::-webkit-color-swatch { border:0; border-radius:4px; }
+.palette-popover-swatch .palette-picker::-moz-color-swatch { border:0; border-radius:4px; }
+.palette-popover-swatch-label { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size:13px; color:#0f172a; }
+.palette-popover-actions { display:flex; justify-content:flex-end; gap:8px; }
+.palette-popover-actions .btn-primary-green { padding:8px 14px; font-size:13px; }
+.palette-popover-actions .btn-secondary { padding:8px 14px; font-size:13px; border-style:solid; }
 
 .step1-authors { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
 .author-chip  { background:#f1f5f9; padding:3px 10px; border-radius:999px; font-size:12px; display:inline-flex; align-items:center; gap:6px; }
@@ -1032,13 +1064,16 @@ select.marker-taxo option { color: #0f172a; background: #fff; padding: 10px; fon
 .step2[data-panel-mode="floating"][data-rail-collapsed="true"] { grid-template-columns: var(--rail-compact-w) 1fr 0; }
 .step2[data-panel-mode="floating"] .step2-marker-panel {
     position: fixed;
-    top: var(--panel-float-top, 110px);
+    /* Default top (260px) clears the BUW site header + subheader so the panel
+       never starts underneath the navbar. User drags override this via
+       --panel-float-top (clamped below so dragged positions still fit). */
+    top: var(--panel-float-top, 260px);
     left: var(--panel-float-left, auto);
     right: var(--panel-float-right, 24px);
     width: var(--panel-float-w, 360px);
-    height: var(--panel-float-h, 72vh);
-    max-height: calc(100vh - 40px);
-    z-index: 60;
+    height: var(--panel-float-h, 60vh);
+    max-height: calc(100vh - 280px);
+    z-index: 1200;  /* above .navbar (z-index: 1000) so drags aren't hidden */
     border: 1px solid #e2e8f0;
     box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
     resize: both;
@@ -1159,23 +1194,37 @@ select.marker-taxo option { color: #0f172a; background: #fff; padding: 10px; fon
 .step2[data-rail-collapsed="true"]  .step2-rail         .step2-chev { transform: rotate(180deg); }
 .step2[data-panel-collapsed="true"] .step2-marker-panel .step2-chev { transform: rotate(180deg); }
 
-/* Resize handle with a visible grip indicator */
+/* Resize handle — spans the FULL height of the aside so the author can grab it
+   anywhere along the edge (the old 48px-tall handle was far down the pane and
+   easy to miss — see iPad feedback). */
 .step2-resize-handle {
-    position:absolute; top:50%; transform:translateY(-50%);
-    width:12px; height:48px;
+    position:absolute; top:0; bottom:0;
+    /* Touch-friendly (iPad): wider hit area than the visual grip. */
+    width:18px;
     cursor:col-resize; z-index:2;
-    right:-6px;
+    right:-9px;
     display:flex; align-items:center; justify-content:center;
     background:transparent;
+    touch-action: none;
 }
-.step2-resize-handle-left { left:-6px; right:auto; }
+.step2-resize-handle-left { left:-9px; right:auto; }
+/* Grip: visible by default (not only on hover), with dotted "grab" indicator. */
 .step2-resize-grip {
-    display:block; width:4px; height:36px; border-radius:2px;
-    background:#e2e8f0;
-    transition: background .15s, width .15s;
+    display:block;
+    width:4px; height:64px; border-radius:3px;
+    background:#cbd5e1;
+    box-shadow: 0 0 0 1px rgba(15,23,42,0.04);
+    transition: background .15s, width .15s, height .15s;
 }
 .step2-resize-handle:hover .step2-resize-grip,
-.step2-resize-handle.is-active .step2-resize-grip { background:var(--uni-green); width:6px; }
+.step2-resize-handle.is-active .step2-resize-grip {
+    background:var(--uni-green); width:6px; height:84px;
+}
+/* Also show the grip on focus so keyboard/tablet users get a clear cue. */
+.step2-resize-handle:focus-visible { outline: none; }
+.step2-resize-handle:focus-visible .step2-resize-grip {
+    background: var(--uni-green); width:6px;
+}
 .step2[data-rail-collapsed="true"]  .step2-rail         .step2-resize-handle,
 .step2[data-panel-collapsed="true"] .step2-marker-panel .step2-resize-handle { display:none; }
 
@@ -1217,12 +1266,53 @@ select.marker-taxo option { color: #0f172a; background: #fff; padding: 10px; fon
 .marker-mini[aria-selected="true"] { box-shadow:0 0 0 2px var(--uni-green), 0 2px 6px rgba(0,0,0,0.2); }
 .marker-rail-empty { font-size:10px; color:#cbd5e1; text-align:center; padding:16px 4px; }
 
-.scene-rail { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
-.scene-thumb { display:flex; align-items:center; gap:8px; padding:8px; border:2px solid transparent; border-radius:8px; cursor:pointer; }
+.scene-rail { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; touch-action: pan-y; }
+.scene-thumb {
+    display:flex; align-items:center; gap:8px; padding:8px;
+    border:2px solid transparent; border-radius:8px;
+    cursor: grab;
+    /* Hint for touch users: the item is grabbable. */
+    user-select: none; -webkit-user-select: none;
+    transition: background .15s, border-color .15s, transform .1s;
+}
 .scene-thumb:hover { background:#f8fafc; }
 .scene-thumb[aria-selected="true"] { background: var(--uni-green-50); border-color: var(--uni-green); }
+.scene-thumb.scene-thumb-dragging {
+    opacity: .35;
+    background: #f1f5f9;
+    border-style: dashed;
+    cursor: grabbing;
+}
+.scene-thumb-ghost {
+    list-style: none;
+    display: flex; align-items: center; gap: 8px; padding: 8px;
+    border: 2px solid var(--uni-green);
+    border-radius: 8px;
+    background: #fff;
+}
+.scene-thumb-ghost .scene-num { font-weight: 700; font-size: 12px; color: var(--uni-green); min-width: 12px; }
+.scene-thumb-ghost .scene-thumb-img { width: 56px; aspect-ratio: 4/3; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+.scene-thumb-ghost .scene-thumb-img img { width: 100%; height: 100%; object-fit: cover; }
+.scene-thumb-ghost .scene-thumb-name { flex: 1; font-size: 11px; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scene-num { font-weight:700; font-size:12px; color:#64748b; min-width:12px; }
 .scene-thumb[aria-selected="true"] .scene-num { color: var(--uni-green); }
+.scene-drag-handle {
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #cbd5e1; cursor: grab; flex: 0 0 auto;
+    transition: color .15s;
+}
+.scene-drag-handle svg { fill: currentColor; display: block; }
+.scene-thumb:hover .scene-drag-handle { color: var(--uni-green); }
+.scene-thumb[aria-selected="true"] .scene-drag-handle { color: var(--uni-green); }
+.scene-thumb.scene-thumb-dragging .scene-drag-handle { cursor: grabbing; }
+.scene-rail-hint {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 2px 8px;
+    font-size: 11px; color: #94a3b8;
+    border-bottom: 1px dashed #e2e8f0;
+    margin-bottom: 8px;
+}
+.scene-rail-hint svg { fill: currentColor; flex: 0 0 auto; }
 .scene-thumb-img { width:56px; aspect-ratio:4/3; background:#e2e8f0; border-radius:4px; overflow:hidden; }
 .scene-thumb-img img { width:100%; height:100%; object-fit:cover; }
 .scene-thumb-name { flex:1; font-size:11px; color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1232,20 +1322,63 @@ select.marker-taxo option { color: #0f172a; background: #fff; padding: 10px; fon
     border-top:1px solid #e2e8f0;
     display:flex; flex-direction:column; gap:6px;
 }
+.scene-rail-actions .scene-add-btn {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(137,186,23,0.28);
+}
+.scene-rail-actions .scene-add-btn:hover {
+    box-shadow: 0 3px 10px rgba(137,186,23,0.40);
+}
+.step2-scene-actions .scene-upload-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(137,186,23,0.28);
+}
+.step2-scene-actions .scene-upload-btn:hover {
+    box-shadow: 0 3px 10px rgba(137,186,23,0.40);
+}
 
 .step2-canvas-wrap { display:flex; flex-direction:column; gap:8px; }
-.step2-scene-header { background:#fff; border-radius:8px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; }
+.step2-scene-header {
+    background:#fff; border-radius:8px; padding:10px 14px;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    flex-wrap: nowrap; min-height: 58px;
+}
+/* Label+title column grows as the title wraps. Capped so the actions cluster
+   (zoom / Bild hochladen / Löschen) always stays on the right without being
+   squashed. */
+.step2-scene-header > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 520px;
+    display: flex; flex-direction: column; gap: 4px;
+}
 .step2-scene-header .field-label {
     font-size: 13px; font-weight: 700; color: #0f172a;
-    text-transform: uppercase; letter-spacing: .04em; margin: 0 0 4px;
+    text-transform: uppercase; letter-spacing: .04em; margin: 0;
 }
 .step2-scene-header .active-scene-num { color: var(--uni-green-700, #0f172a); }
+/* Idle: wrap the full title onto multiple lines so the author can read it
+   completely. Edit (focus): collapse to a single scrollable line so the
+   caret stays visible and the field height doesn't jump while typing. */
 .step2-scene-name {
-    font-size:18px; font-weight:600; color:#0f172a;
+    font-size:18px; font-weight:600; color:#0f172a; line-height:1.3;
     padding:6px 10px; border:1px dashed #cbd5e1; border-radius:6px;
-    outline:none; min-width:220px; cursor:text;
+    outline:none; min-width:0; max-width:100%; width:100%; cursor:text;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
     transition: border-color .15s, background .15s;
 }
+.step2-scene-name:focus {
+    white-space: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    text-overflow: clip;
+}
+/* Keep the actions cluster from shrinking into itself. */
+.step2-scene-header .step2-scene-actions { flex-shrink: 0; align-items: center; }
 .step2-scene-name:hover { border-color: #94a3b8; background: #f8fafc; }
 .step2-scene-name:focus { border-style: solid; border-color: var(--uni-green); background: var(--uni-green-50); }
 .step2-scene-name:empty::before {
@@ -1338,7 +1471,14 @@ select.marker-taxo option { color: #0f172a; background: #fff; padding: 10px; fon
 .marker-dot.is-dragging { cursor:grabbing; box-shadow:0 6px 14px rgba(0,0,0,0.55); z-index:3; }
 .marker-dot[aria-selected="true"]::after { content:''; position:absolute; inset:-6px; border-radius:50%; border:2px solid currentColor; }
 
-.marker-panel-empty { color:#94a3b8; font-size:12px; }
+.marker-panel-empty {
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    gap:10px; padding:24px 16px; color:#334155;
+}
+.marker-panel-empty-icon { font-size:36px; line-height:1; opacity:.9; }
+.marker-panel-empty-title { font-size:15px; font-weight:700; color:#0f172a; }
+.marker-panel-empty-hint { font-size:13px; line-height:1.5; color:#475569; max-width:26ch; }
+.marker-panel-empty-hint strong { color:var(--uni-green-700, #5a7f0f); font-weight:600; }
 
 .btn-secondary { padding:8px; background:#f1f5f9; border:1px dashed #cbd5e1; border-radius:6px; font-size:12px; color:#334155; cursor:pointer; }
 .btn-secondary:hover { background:#e2e8f0; }
@@ -1496,7 +1636,93 @@ select.marker-taxo { cursor:pointer; font-size:14px; }
 .step3-share-url { width:100%; padding:8px; border:1px solid #e2e8f0; border-radius:8px; font-family:monospace; font-size:11px; color:#475569; }
 .step3-share-actions { display:flex; gap:6px; }
 .step3-share-actions .btn-secondary { flex:1; text-align:center; }
+.step3-share-toggle { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:13px; color:#334155; cursor:pointer; user-select:none; }
+.step3-share-toggle input[type="checkbox"] { width:16px; height:16px; accent-color:#90bc14; cursor:pointer; }
+.step3-share-toggle input[type="checkbox"]:disabled { cursor:not-allowed; opacity:.5; }
+.step3-share-toggle:has(input:disabled) { color:#94a3b8; cursor:not-allowed; }
+.step3-share-actions .btn-secondary.is-disabled { opacity:.5; pointer-events:none; cursor:not-allowed; }
 .step3-empty { text-align:center; padding:80px 20px; grid-column: 1 / -1; }
 .step3:not(.is-empty) .step3-empty { display:none; }
 .step3.is-empty .step3-preview,
 .step3.is-empty .step3-side { display:none; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   iPad / tablet responsive rules (Builder view). Students use the tool
+   mostly on iPads, so these breakpoints are tuned around iPad widths:
+     • 1024px landscape iPad Pro / Air
+     • 820px  iPad Air (landscape 11″)
+     • 768px  iPad mini portrait
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Tablet landscape: shrink the fixed rail / marker-panel columns so the
+   canvas (the image — the thing students care about) keeps a useful size. */
+@media (max-width: 1180px) {
+    .step2 {
+        --rail-w: 180px;
+        --panel-w: 280px;
+        padding: 12px 14px;
+        gap: 10px;
+    }
+    .step1 { padding: 12px 14px; }
+    .step1-hero { gap: 14px; }
+    .step3 { grid-template-columns: 1fr 280px; padding: 14px; }
+}
+
+/* Tablet portrait (iPad 768–1024): stack the Step-1 hero, shrink Step-2
+   widths further, and let the canvas use its full width. */
+@media (max-width: 1024px) {
+    .step2 {
+        --rail-w: 160px;
+        --panel-w: 260px;
+        --aside-min: 140px;
+    }
+    .step2-scene-name { font-size: 16px; min-width: 140px; }
+    .step2-scene-header { padding: 8px 10px; min-height: 52px; }
+    .step2-scene-actions .btn-secondary,
+    .step2-scene-actions .btn-primary-green,
+    .step2-scene-actions .btn-danger { padding: 8px 10px; }
+    /* Make zoom / action buttons finger-sized (44px hit target). */
+    .step2-zoom-btn { width: 32px; height: 32px; }
+    .step2-collapse-btn { width: 34px; height: 34px; }
+    .step3 { grid-template-columns: 1fr; }
+    .step3-side { flex-direction: row; flex-wrap: wrap; }
+    .step3-card { flex: 1 1 220px; min-width: 220px; }
+}
+
+/* iPad portrait / small tablet: auto-collapse the rail so the canvas wins
+   the available width. Authors can expand again with the chevron. */
+@media (max-width: 900px) {
+    .step2 {
+        grid-template-columns: var(--rail-compact-w) 1fr var(--panel-compact-w);
+    }
+    /* Only override if the user hasn't already expanded manually (the JS
+       writes the toggled state onto the grid as data attributes). */
+    .step2:not([data-rail-collapsed="false"])  .step2-rail         .step2-aside-expanded  { display: none; }
+    .step2:not([data-rail-collapsed="false"])  .step2-rail         .step2-aside-collapsed { display: flex; }
+    .step2:not([data-panel-collapsed="false"]) .step2-marker-panel .step2-aside-expanded  { display: none; }
+    .step2:not([data-panel-collapsed="false"]) .step2-marker-panel .step2-aside-collapsed { display: flex; }
+
+    .step1-hero { grid-template-columns: 1fr; }
+    /* Step-1 fields already stack vertically (flex column) — no override needed. */
+}
+
+@media (max-width: 640px) {
+    .step2 { padding: 8px; gap: 8px; }
+    .step3-card { flex: 1 1 100%; }
+    /* Hide the "builder needs a bigger screen" notice here —
+       we make do with a single-column layout instead of locking out. */
+    .builder-phone-notice { display: none; }
+}
+
+/* Touch-first tweaks: wider resize handles, bigger tap targets on buttons,
+   available on any pointer:coarse device (iPad included). */
+@media (pointer: coarse) {
+    .step2-resize-handle { width: 26px; right: -13px; }
+    .step2-resize-handle-left { left: -13px; right: auto; }
+    .step2-resize-grip { width: 5px; height: 80px; background: #94a3b8; }
+    .palette-chip { width: 32px; height: 32px; }
+    .palette-add { width: 32px; height: 32px; font-size: 18px; }
+    .btn-secondary, .btn-danger { min-height: 36px; }
+    .step2-zoom-btn { width: 36px; height: 36px; }
+    .step2-collapse-btn { width: 36px; height: 36px; }
+}

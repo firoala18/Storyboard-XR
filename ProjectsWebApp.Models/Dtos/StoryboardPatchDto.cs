@@ -16,4 +16,6 @@ public class StoryboardPatchDto
     public string? LicenseExtras { get; set; }
     public string? Authors { get; set; }
     public string? CoverImagePath { get; set; }
+    public bool? IsShared { get; set; }
+    public bool? AllowSharedEditing { get; set; }
 }

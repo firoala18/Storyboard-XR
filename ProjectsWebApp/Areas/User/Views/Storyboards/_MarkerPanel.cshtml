@@ -4,11 +4,21 @@
     // Cap marker Taxonomie at the storyboard's Taxonomie. If the board has
     // no Taxonomie set, allow all levels.
     var maxMarkerTaxo = Model.Taxonomie.HasValue ? (int)Model.Taxonomie.Value : 5;
+
+    // Client-side mirror of the TaxonomieStufe names (in enum-value order 0..N) so
+    // we can rebuild the marker taxo <select> on the fly when Step 1 changes the cap.
+    var taxoNamesJson = System.Text.Json.JsonSerializer.Serialize(
+        Enum.GetValues<TaxonomieStufe>().Select(t => t.ToString()).ToArray()
+    );
 }
 
 <div class="marker-panel-empty" data-role="marker-panel-empty">
-    Kein Marker ausgewählt.
-    <div style="margin-top:6px; font-size:11px; color:#cbd5e1;">Klicke ins Bild, um einen Marker zu setzen.</div>
+    <div class="marker-panel-empty-icon" aria-hidden="true">📍</div>
+    <div class="marker-panel-empty-title">Noch kein Marker gesetzt</div>
+    <div class="marker-panel-empty-hint">
+        Klicke ins Bild, um einen Marker zu setzen.<br />
+        Hier kannst du dann <strong>Didaktik</strong>, <strong>KI-Prompts</strong> und weitere Details hinterlegen.
+    </div>
 </div>
 
 <div class="marker-panel" data-role="marker-panel" hidden>
@@ -22,7 +32,7 @@
     <div class="marker-panel-body">
         <div class="field-label">Farbe</div>
         <div class="marker-color-picker" data-role="color-picker">
-            @foreach (var c in new[] { "#ef4444", "#3b82f6", "#f59e0b", "#89ba17", "#8b5cf6", "#0ea5e9", "#64748b" })
+            @foreach (var c in new[] { "#89ba17", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#0ea5e9", "#64748b" })
             {
                 <button type="button" class="color-swatch" style="background:@c" data-color="@c"></button>
             }
@@ -117,6 +127,12 @@
     let editorsReady = false;
     const editorFields = ['description', 'ziel', 'promptIdee', 'reflexion', 'datenablage', 'quellen'];
     const chipStrip = panel.querySelector('[data-role="marker-chip-strip"]');
+
+    // Names for all TaxonomieStufe values (server-rendered, enum-value order).
+    const TAXO_NAMES = @Html.Raw(taxoNamesJson);
+    // Flag used to suppress the marker-taxonomie PATCH while we programmatically
+    // rebuild the <select> in response to a storyboard-level Taxonomie change.
+    let suppressMarkerTaxoChange = false;
 
     function renderChipStrip(markers, activeId) {
         if (!chipStrip) return;
@@ -214,6 +230,7 @@
     }
 
     panel.querySelector('[data-field="taxonomie"]')?.addEventListener('change', (ev) => {
+        if (suppressMarkerTaxoChange) return;
         if (!activeMarkerId) return;
         const raw = ev.target.value;
         // Server's default JSON binder rejects null for nullable enums, and the
@@ -224,6 +241,60 @@
         window.Builder.patchField('marker', activeMarkerId, 'taxonomie', value, { immediate: true });
         const m = activeSceneMarkers.find(x => x.id === activeMarkerId);
         if (m) m.taxonomie = value;
+    });
+
+    // Rebuild the marker taxo <select> when the storyboard-level Taxonomie
+    // cap changes in Step 1. Keeps any already-selected marker value that now
+    // sits above the cap, labelled so the user can still see (and lower) it.
+    function rebuildMarkerTaxoSelect(newMax) {
+        const sel = panel.querySelector('[data-field="taxonomie"]');
+        if (!sel) return;
+        const lastEnumIdx = TAXO_NAMES.length - 1;
+        const effectiveMax = (typeof newMax === 'number' && newMax >= 0)
+            ? Math.min(newMax, lastEnumIdx)
+            : lastEnumIdx;
+        const previousValue = sel.value;
+
+        sel.dataset.maxTaxo = String(effectiveMax);
+        sel.innerHTML = '';
+
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '— bitte wählen —';
+        sel.appendChild(blank);
+
+        for (let i = 0; i <= effectiveMax; i++) {
+            const opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = (i + 1) + '. ' + (TAXO_NAMES[i] ?? String(i));
+            sel.appendChild(opt);
+        }
+
+        if (previousValue !== '' && Number(previousValue) > effectiveMax) {
+            const opt = document.createElement('option');
+            opt.value = previousValue;
+            opt.textContent = (Number(previousValue) + 1) + '. (über dem aktuellen Board-Max)';
+            sel.appendChild(opt);
+        }
+        sel.value = previousValue;
+
+        // Ask the UiSelect wrapper to resync its visible label / open list,
+        // but suppress our own change handler so this doesn't trigger a PATCH.
+        suppressMarkerTaxoChange = true;
+        try { sel.dispatchEvent(new Event('change', { bubbles: true })); }
+        finally { suppressMarkerTaxoChange = false; }
+
+        const hint = panel.querySelector('[data-role="taxo-hint"]');
+        if (hint) {
+            hint.textContent = (typeof newMax === 'number' && TAXO_NAMES[newMax] !== undefined)
+                ? ('· max. ' + TAXO_NAMES[newMax])
+                : '';
+        }
+    }
+
+    window.addEventListener('builder:storyboard-taxonomie-changed', (ev) => {
+        const v = ev.detail?.value;
+        rebuildMarkerTaxoSelect(typeof v === 'number' ? v : null);
     });
 
     panel.querySelector('.marker-input')?.addEventListener('blur', (ev) => {

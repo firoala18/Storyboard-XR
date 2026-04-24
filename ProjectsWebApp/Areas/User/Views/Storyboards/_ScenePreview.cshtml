@@ -1,6 +1,14 @@
 @model ProjectsWebApp.Models.Storyboard
 @{
+    // Empty scenes (no image AND no name AND no markers) shouldn't appear in
+    // the preview — they are work-in-progress drafts that just clutter the PDF
+    // and the carousel. They stay visible in the Step-2 editor rail.
+    static bool HasPreviewContent(ProjectsWebApp.Models.Scene s) =>
+        !string.IsNullOrWhiteSpace(s.ImagePath)
+        || !string.IsNullOrWhiteSpace(s.Name)
+        || (s.Markers?.Any() == true);
     var previewScenes = (Model.Scenes ?? Enumerable.Empty<ProjectsWebApp.Models.Scene>())
+        .Where(HasPreviewContent)
         .OrderBy(s => s.Number)
         .ThenBy(s => s.Id)
         .ToList();
@@ -34,7 +42,7 @@
                         @foreach (var m in (sc.Markers ?? Enumerable.Empty<ProjectsWebApp.Models.Marker>()).OrderBy(x => x.Number))
                         {
                             <span class="scene-preview-marker"
-                                  style="left:@((m.X * 100).ToString(System.Globalization.CultureInfo.InvariantCulture))%;top:@((m.Y * 100).ToString(System.Globalization.CultureInfo.InvariantCulture))%;background:@(string.IsNullOrWhiteSpace(m.ColorHex) ? "#ef4444" : m.ColorHex);"
+                                  style="left:@((m.X * 100).ToString(System.Globalization.CultureInfo.InvariantCulture))%;top:@((m.Y * 100).ToString(System.Globalization.CultureInfo.InvariantCulture))%;background:@(string.IsNullOrWhiteSpace(m.ColorHex) ? "#89ba17" : m.ColorHex);"
                                   title="@m.Description">
                                 @m.Number
                             </span>

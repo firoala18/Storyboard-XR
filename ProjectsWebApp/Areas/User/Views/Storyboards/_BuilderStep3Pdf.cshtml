@@ -4,7 +4,13 @@
     var viewerUrl = Url.Action("Viewer", "Storyboards", new { area = "User", id = Model.Id });
     var promptListUrl = Url.Action("PromptList", "Storyboards", new { area = "User", id = Model.Id });
     var reflexionUrl = Url.Action("ReflexionList", "Storyboards", new { area = "User", id = Model.Id });
-    var publicViewerUrl = Url.Action("OpenBySlug", "PublicStoryboards", new { area = "User", slug = Model.PublicId });
+    // Share link matches what the recipient actually gets: the read-only
+    // Viewer when collab-edit is off, the Builder when it's on.
+    var publicViewerUrl = Model.AllowSharedEditing
+        ? Url.Action("OpenBySlug", "PublicStoryboards", new { area = "User", slug = Model.PublicId })
+        : Url.Action("ViewBySlug", "PublicStoryboards", new { area = "User", slug = Model.PublicId });
+    var isOwner = ViewBag.IsOwner as bool? ?? false;
+    var ownerIsAuthenticated = !string.IsNullOrWhiteSpace(Model.OwnerId);
 }
 
 <div class="step3 @(hasScenes ? "" : "is-empty")">
@@ -39,9 +45,49 @@
             <div class="field-label">🔗 Teilen</div>
             <input type="text" readonly class="step3-share-url" value="@publicViewerUrl" />
             <div class="step3-share-actions">
-                <button type="button" class="btn-secondary" data-action="copy-share">📋 Kopieren</button>
-                <a class="btn-secondary" href="@publicViewerUrl" target="_blank" rel="noopener">🌐 Viewer</a>
+                <button type="button" class="btn-secondary" data-action="copy-share" @(!Model.IsShared ? "disabled" : "")>📋 Kopieren</button>
+                <a class="btn-secondary @(!Model.IsShared ? "is-disabled" : "")"
+                   href="@publicViewerUrl" target="_blank" rel="noopener"
+                   @(!Model.IsShared ? "aria-disabled=true tabindex=-1" : "")>🌐 Viewer</a>
             </div>
+
+            @if (isOwner)
+            {
+                <label class="step3-share-toggle">
+                    <input type="checkbox"
+                           class="js-is-shared-toggle"
+                           @(Model.IsShared ? "checked" : "") />
+                    <span>Teilen aktivieren (andere können ansehen)</span>
+                </label>
+
+                <label class="step3-share-toggle">
+                    <input type="checkbox"
+                           class="js-allow-edit-toggle"
+                           @(Model.AllowSharedEditing ? "checked" : "")
+                           @(Model.IsShared ? "" : "disabled") />
+                    <span>Gemeinsam bearbeiten erlauben</span>
+                </label>
+
+                <p class="step3-help">
+                    @if (!Model.IsShared)
+                    {
+                        <text>Nur Sie selbst sehen dieses Storyboard. Aktivieren Sie Teilen, damit andere über den Link darauf zugreifen können.</text>
+                    }
+                    else if (Model.AllowSharedEditing)
+                    {
+                        <text>Personen mit dem Link können live mitbearbeiten (Live-Sync via SignalR).</text>
+                    }
+                    else
+                    {
+                        <text>Personen mit dem Link können das Storyboard ansehen. Für gemeinsames Bearbeiten zusätzlich die zweite Option aktivieren.</text>
+                    }
+                    @if (ownerIsAuthenticated)
+                    {
+                        <br />
+                        <em>Da Sie angemeldet sind, müssen sich Mitbearbeitende ebenfalls anmelden.</em>
+                    }
+                </p>
+            }
         </div>
     </aside>
 </div>
@@ -58,6 +104,53 @@
         } catch {
             input.select(); document.execCommand('copy');
         }
+    });
+
+    const sbIdForToggles = document.querySelector('.builder-main')?.dataset.storyboardId;
+
+    async function patchShareFlags(body, chipMsg, rollback) {
+        try {
+            const res = await fetch(window.apiUrl(`/Storyboards/${sbIdForToggles}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) { rollback(); window.Builder?.setChip('error', 'Änderung fehlgeschlagen'); return; }
+            window.Builder?.setChip('saved', chipMsg);
+            // SignalR bundle is only rendered server-side when AllowSharedEditing
+            // is true, so a reload ensures it attaches/detaches cleanly. Also
+            // applies to IsShared since gating Viewer/Builder routes on it
+            // means the viewer card buttons should update.
+            setTimeout(() => location.reload(), 400);
+        } catch { rollback(); window.Builder?.setChip('error', 'Änderung fehlgeschlagen'); }
+    }
+
+    const isSharedToggle = document.querySelector('.js-is-shared-toggle');
+    const allowEditToggle = document.querySelector('.js-allow-edit-toggle');
+
+    isSharedToggle?.addEventListener('change', () => {
+        const enabled = isSharedToggle.checked;
+        isSharedToggle.disabled = true;
+        // Turning sharing off cascades: collab-edit must also be off.
+        const body = enabled
+            ? { isShared: true }
+            : { isShared: false, allowSharedEditing: false };
+        patchShareFlags(body, enabled ? 'Teilen aktiviert…' : 'Teilen deaktiviert…',
+            () => { isSharedToggle.checked = !enabled; isSharedToggle.disabled = false; });
+    });
+
+    allowEditToggle?.addEventListener('change', () => {
+        const enabled = allowEditToggle.checked;
+        if (enabled && !isSharedToggle?.checked) {
+            // Should be prevented by the disabled attribute, but guard anyway.
+            allowEditToggle.checked = false;
+            window.Builder?.setChip('error', 'Bitte zuerst „Teilen aktivieren"');
+            return;
+        }
+        allowEditToggle.disabled = true;
+        patchShareFlags({ allowSharedEditing: enabled },
+            enabled ? 'Mitbearbeiten aktiviert…' : 'Mitbearbeiten deaktiviert…',
+            () => { allowEditToggle.checked = !enabled; allowEditToggle.disabled = false; });
     });
     document.querySelectorAll('[data-goto-step]').forEach(b =>
         b.addEventListener('click', () => window.Builder.gotoStep(Number(b.dataset.gotoStep))));
@@ -77,9 +170,14 @@
         root.className = 'scene-preview';
         root.tabIndex = 0;
 
-        const scenes = data.scenes || [];
+        // Empty scenes (no image, no name, no markers) are work-in-progress drafts
+        // that clutter the carousel and the exported PDF — hide them here. They
+        // stay visible in Step 2 so authors can still fill them in.
+        const scenes = (data.scenes || []).filter(s =>
+            !!s.imagePath || (s.name && s.name.trim()) || (s.markers && s.markers.length > 0)
+        );
         if (scenes.length === 0) {
-            root.innerHTML = '<div class="scene-preview-empty">Noch keine Szenen.</div>';
+            root.innerHTML = '<div class="scene-preview-empty">Noch keine Szenen mit Inhalt.</div>';
             host.appendChild(root);
             return;
         }
@@ -191,11 +289,14 @@
             if (!res.ok) return;
             const data = await res.json();
             buildPreview(data);
-            // Toggle empty state vs. preview layout
+            // Toggle empty state vs. preview layout. Use the same content filter
+            // as the preview above so "hat 1 Szene aber leer" counts as empty.
             const step3 = document.querySelector('.step3');
             if (step3) {
-                const hasScenes = (data.scenes || []).length > 0;
-                step3.classList.toggle('is-empty', !hasScenes);
+                const filledScenes = (data.scenes || []).filter(s =>
+                    !!s.imagePath || (s.name && s.name.trim()) || (s.markers && s.markers.length > 0)
+                );
+                step3.classList.toggle('is-empty', filledScenes.length === 0);
             }
         } catch (err) {
             console.warn('Step 3 refresh failed', err);

@@ -35,4 +35,9 @@
     <script src="~/js/ui-select.js" asp-append-version="true"></script>
     <script src="~/js/builder.js" asp-append-version="true"></script>
     <script src="~/js/builder-step2.js" asp-append-version="true"></script>
+    @if (Model.AllowSharedEditing)
+    {
+        <script defer src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@7.0.5/dist/browser/signalr.min.js"></script>
+        <script defer src="~/js/builder-signalr.js" asp-append-version="true"></script>
+    }
 }

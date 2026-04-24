@@ -67,6 +67,14 @@ namespace ProjectsWebApp.Models
 
         public bool Readonly { get; set; } = false;
 
+        // Gates the public share link itself. When false, only the owner
+        // (by login or by anon token) can open the storyboard at all.
+        public bool IsShared { get; set; } = false;
+
+        // Additionally allows shared viewers to edit collaboratively via
+        // SignalR. Only meaningful when IsShared is also true.
+        public bool AllowSharedEditing { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
 

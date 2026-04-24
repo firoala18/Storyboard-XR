@@ -238,13 +238,15 @@
 /* Floating and below modes */
 .viewer-stage-grid[data-panel-mode="floating"] .viewer-panel {
     position: fixed;
-    top: var(--panel-float-top, 110px);
+    /* Default top clears the BUW site header — at 110px the panel was sliding
+       behind the navbar on the public viewer page. */
+    top: var(--panel-float-top, 260px);
     left: var(--panel-float-left, auto);
     right: var(--panel-float-right, 24px);
     width: var(--panel-float-w, 360px);
-    height: var(--panel-float-h, 72vh);
-    max-height: calc(100vh - 40px);
-    z-index: 60;
+    height: var(--panel-float-h, 60vh);
+    max-height: calc(100vh - 280px);
+    z-index: 1200;  /* above the site navbar (z-index: 1000) */
     border: 1px solid #e2e8f0;
     box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
     resize: both;
@@ -393,14 +395,15 @@
     position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 92vw;
     background: #fff; border-left: 1px solid #e5e7eb;
     box-shadow: -20px 0 40px rgba(15,23,42,.14);
-    z-index: 80;
+    z-index: 1210;  /* above the site navbar (z-index: 1000) */
     display: flex; flex-direction: column;
     transform: translateX(100%); transition: transform .24s ease;
 }
 .viewer-info-drawer[data-open="true"] { transform: translateX(0); }
 .viewer-info-drawer[hidden] { display: none; }
 .viewer-info-scrim {
-    position: fixed; inset: 0; background: rgba(15,23,42,.28); z-index: 70;
+    position: fixed; inset: 0; background: rgba(15,23,42,.28);
+    z-index: 1205;  /* just below the drawer, above the navbar */
     opacity: 0; transition: opacity .2s ease;
 }
 .viewer-info-scrim[data-open="true"] { opacity: 1; }
@@ -445,12 +448,15 @@
     border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25);
     color: #fff; font-weight: 700; font-size: 12px;
     display: inline-flex; align-items: center; justify-content: center;
-    background: #78a7ff; cursor: pointer; pointer-events: auto;
+    background: #89ba17; cursor: pointer; pointer-events: auto;
     transition: transform .1s, box-shadow .15s;
 }
 .viewer-overlay .marker-dot:hover { transform: translate(-50%, -50%) scale(1.1); }
+/* Selection ring is palette-independent (Uni green) so it never looks like an error
+   when a red/orange palette color is first in the storyboard. */
 .viewer-overlay .marker-dot.is-selected {
-    box-shadow: 0 0 0 3px var(--role-primary-500, #89ba17), 0 2px 6px rgba(0,0,0,.25);
+    box-shadow: 0 0 0 3px #89ba17, 0 0 0 5px rgba(255,255,255,.85), 0 2px 6px rgba(0,0,0,.25);
+    z-index: 2;
 }
 
 /* ----- Scene header + canvas wrap ----- */
@@ -564,6 +570,49 @@
 
 /* Share link flash feedback */
 .viewer-tb-btn.is-flashing { background: var(--role-chip-bg, #f0fdf4); border-color: var(--role-primary-500, #89ba17); }
+
+/* ----- Share popover ----- */
+.viewer-share { position: relative; display: inline-flex; }
+.viewer-share-popover {
+    position: absolute; top: calc(100% + 8px); right: 0;
+    width: 320px; max-width: 90vw;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    box-shadow: 0 12px 40px -8px rgba(15,23,42,.22), 0 4px 12px rgba(15,23,42,.08);
+    padding: 14px; z-index: 1220;
+    display: flex; flex-direction: column; gap: 10px;
+}
+.viewer-share-popover[hidden] { display: none; }
+.viewer-share-head {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 2px;
+}
+.viewer-share-head h3 { margin: 0; font-size: 14px; font-weight: 700; color: #0f172a; }
+.viewer-share-close {
+    width: 26px; height: 26px; border: 1px solid #e5e7eb; border-radius: 6px;
+    background: #fff; color: #6b7280; cursor: pointer; font-size: 13px;
+}
+.viewer-share-close:hover { background: #f1f5f9; color: #0f172a; }
+.viewer-share-url {
+    width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px;
+    font-family: monospace; font-size: 11px; color: #475569; background: #f8fafc;
+}
+.viewer-share-actions { display: flex; gap: 6px; }
+.viewer-share-actions .btn-secondary { flex: 1; text-align: center; }
+.viewer-share-actions .btn-secondary.is-disabled { opacity: .5; pointer-events: none; cursor: not-allowed; }
+.viewer-share-toggle {
+    display: flex; align-items: center; gap: 8px; margin-top: 2px;
+    font-size: 12px; color: #334155; cursor: pointer; user-select: none;
+}
+.viewer-share-toggle input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: var(--role-primary-500, #89ba17); cursor: pointer;
+}
+.viewer-share-toggle input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .5; }
+.viewer-share-toggle:has(input:disabled) { color: #94a3b8; cursor: not-allowed; }
+.viewer-share-help { margin: 0; font-size: 11px; line-height: 1.45; color: #64748b; }
+.viewer-share-help em { color: #475569; font-style: italic; }
+.viewer-share-status { min-height: 1em; font-size: 12px; font-weight: 500; }
+.viewer-share-status[data-kind="ok"]  { color: var(--role-primary-600, #65a30d); }
+.viewer-share-status[data-kind="err"] { color: #dc2626; }
 
 /* Responsive: compress rail at mid widths. */
 @media (max-width: 1099px) {

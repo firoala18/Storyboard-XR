@@ -855,14 +855,14 @@
                 return curY;
             }
 
-            // Header — always HSM black (#191919), independent of storyboard palette
+            // Header — always uni-green (#89ba17), independent of storyboard palette
             const headerH = 40;
             const titleOrig = meta.title;
-            pdf.setFillColor(25, 25, 25);
+            pdf.setFillColor(137, 186, 23);
             pdf.rect(0, 0, page.w, headerH, 'F');
 
             try {
-                const logo = await svgToPngDataUrl(`${PATH_BASE}/logo-PromptCoach-transparenz.svg`, 2000);
+                const logo = await svgToPngDataUrl(`${PATH_BASE}/images/logo_header_white.svg`, 2000);
                 const ratio = logo.h / logo.w;
                 const logoWmm = 70;
                 const logoHmm = logoWmm * ratio;
@@ -940,7 +940,7 @@
                     pdf.setTextColor(15, 23, 42);
                     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(17);
                     pdf.text(sceneLabel, innerX, yCursor + 6);
-                    pdf.setDrawColor(25, 25, 25); pdf.setLineWidth(0.8);
+                    pdf.setDrawColor(137, 186, 23); pdf.setLineWidth(0.8);
                     const slW = pdf.getTextWidth(sceneLabel);
                     pdf.line(innerX, yCursor + 8.4, innerX + slW, yCursor + 8.4);
                     yCursor += 14;
@@ -1038,7 +1038,7 @@
             const declTitle = 'Erklärung zur Freigabe unter Open-Source-Lizenz';
             pdf.setTextColor(15, 23, 42); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15);
             pdf.text(declTitle, margin, yDecl + 5);
-            pdf.setDrawColor(25, 25, 25); pdf.setLineWidth(0.8);
+            pdf.setDrawColor(137, 186, 23); pdf.setLineWidth(0.8);
             const declW = pdf.getTextWidth(declTitle);
             pdf.line(margin, yDecl + 7.4, margin + declW, yDecl + 7.4);
             yDecl += 14;

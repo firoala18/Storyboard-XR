@@ -202,18 +202,13 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-// Respect reverse proxy (Apache) for scheme/host so redirects are correct.
-// Kestrel only listens inside the container network; host-port binding is 127.0.0.1:5052,
-// so every request has already traversed the host's Apache reverse proxy.
-// Clear KnownProxies/KnownNetworks to trust forwarded headers from any immediate peer
-// (the Docker bridge gateway appears as a non-loopback IP from inside the container).
-var forwardedOpts = new ForwardedHeadersOptions
+// Respect reverse proxy (Apache) for scheme/host so redirects are correct
+app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-};
-forwardedOpts.KnownNetworks.Clear();
-forwardedOpts.KnownProxies.Clear();
-app.UseForwardedHeaders(forwardedOpts);
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    // Accept from local reverse proxy:
+    KnownProxies = { IPAddress.Parse("127.0.0.1"), IPAddress.IPv6Loopback }
+});
 
 app.UseHttpsRedirection();
 

@@ -1,5 +1,0 @@
-@{
-    var bare = Context.Request.Query["bare"].ToString() == "1";
-    Layout = bare ? "_LayoutBare" : "_Layout";
-    if (bare) { ViewData["_H5PBare"] = true; }
-}

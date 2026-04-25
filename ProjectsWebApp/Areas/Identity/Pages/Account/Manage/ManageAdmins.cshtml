@@ -1,0 +1,343 @@
+﻿@page
+@model ProjectsWebApp.Areas.Identity.Pages.Account.Manage.ManageAdminsModel
+@{
+    ViewData["Title"] = "Anwender*innen verwalten";
+}
+
+<style>
+    .card-header-gradient {
+        background: linear-gradient(to right, #434343, #000);
+        color: white;
+    }
+
+    .btn-gradient {
+        background: linear-gradient(to right, #434343, #000);
+        color: white;
+    }
+
+    .role-select {
+        width: auto;
+        display: inline-block;
+    }
+
+    .add-admin:hover{
+        color:white;
+  /*       border:1px solid black;
+        background:black; */
+    }
+</style>
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Administratoren verwalten</h2>
+
+    @if (TempData["success"] != null)
+    {
+        <div class="alert alert-success">@TempData["success"]</div>
+    }
+    @if (TempData["error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["error"]</div>
+    }
+
+    @* ────── Aktuelle Administratoren ────── *@
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card shadow-lg">
+                <div class="card-header card-header-gradient">
+                    <h4 class="mb-0">Aktuelle Anwender*innen</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>E-Mail</th>
+                                <th>Rolle</th>
+                                <th>Löschen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var admin in Model.AdminUsers)
+                            {
+                                var isSuper = await Model.UserManager.IsInRoleAsync(admin, "SuperAdmin");
+                                var isAdmin = await Model.UserManager.IsInRoleAsync(admin, "Admin");
+                                var cnt = Model.AdminUsers.Count;
+                                var isSelf = admin.Email.Equals(User.Identity?.Name, StringComparison.OrdinalIgnoreCase);
+                                var disable = cnt == 1 || isSelf;
+
+                                <tr>
+                                    <td>@admin.Email</td>
+                                    <td>
+                                        <form method="post" asp-page-handler="UpdateStatus" class="d-inline">
+                                            <input type="hidden" name="UpdateStatusEmail" value="@admin.Email" />
+                                            <select name="UpdateStatusRole"
+                                                    class="form-select form-select-sm role-select"
+                                                    data-admin-name="@admin.Email"
+                                                    title="@(disable ? "Mindestens ein Admin muss erhalten bleiben bzw. eigene Rolle ändern nicht erlaubt." : "")"
+                                                    @(disable ? "disabled" : "")>
+                                                <option value="User" selected="@(!isAdmin && !isSuper)">Benutzer</option>
+                                                <option value="Admin" selected="@(isAdmin && !isSuper)">Coach</option>
+                                                <option value="SuperAdmin" selected="@(isSuper)">Administrator</option>
+                                            </select>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <form method="post" asp-page-handler="RemoveAdmin" class="d-inline remove-admin-form">
+                                            <input type="hidden" name="RemoveAdminEmail" value="@admin.Email" />
+                                            <button type="submit"
+                                                    class="btn btn-danger btn-sm"
+                                                    title="@(disable ? "Nicht erlaubt" : "Anwender*innen entfernen")"
+                                                    @(disable ? "disabled" : "")>
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ────── Neuen Administrator hinzufügen ────── *@
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card shadow-lg">
+                <div class="card-header card-header-gradient">
+                    <h4 class="mb-0">Neue Anwender*innen hinzufügen</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="RegisterAdmin" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Name</label>
+                            <input name="NewAdminName" style="background:white;color:black;border-color:gray;" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">E-Mail</label>
+                            <input name="NewAdminEmailRegister" type="email" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Passwort</label>
+                            <input name="NewAdminPassword" type="password" class="form-control" required />
+                        </div>
+                        <div class="col-12 text-end">
+                            <button type="submit" class="btn btn-gradient add-admin w-100">Anwender*innen hinzufügen</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ────── Alle Benutzer ────── -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card shadow-lg">
+                <div class="card-header card-header-gradient">
+                    <h4 class="mb-0">Alle Benutzer</h4>
+                </div>
+
+                <div class="card-body">
+                    <table class="table table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>E‑Mail</th>
+                                <th>Rolle</th>
+                                <th>Storyboards</th>
+                                <th>Löschen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var u in Model.RegularUsers)
+                            {
+                                var isSuper = await Model.UserManager.IsInRoleAsync(u, "SuperAdmin");
+                                var isAdmin = await Model.UserManager.IsInRoleAsync(u, "Admin");
+
+                                <tr>
+                                    <td>@u.Email</td>
+
+                                    <!-- ▼ Rolle ändern – identischer Handler wie oben -->
+                                    <td>
+                                        <form method="post"
+                                              asp-page-handler="UpdateStatus"
+                                              class="d-inline">
+                                            <input type="hidden" name="UpdateStatusEmail" value="@u.Email" />
+
+                                            <select name="UpdateStatusRole"
+                                                    class="form-select form-select-sm role-select-user"
+                                                    data-user-name="@u.Email">
+                                                <option value="User" selected="@(!isAdmin && !isSuper)">Benutzer</option>
+                                                <option value="Admin" selected="@(isAdmin && !isSuper)">Coach</option>
+                                                <option value="SuperAdmin" selected="@(isSuper)">Administrator</option>
+                                            </select>
+                                        </form>
+                                    </td>
+
+                                    <!-- ▼ Links zu Sammlungen / Filtern -->
+                                    <td class="text-nowrap">
+
+                                        <a asp-area="User"
+                                           asp-controller="Storyboards"
+                                           asp-action="Index"
+                                           asp-route-uid="@u.Id"
+                                           class="btn btn-sm btn-secondary"
+                                           title="Storyboards ansehen">
+                                            <i class="bi bi-images"></i>
+                                        </a>
+
+                                    </td>
+
+                                    <!-- ▼ Benutzer löschen -->
+                                    <td>
+                                        <form method="post"
+                                              asp-page-handler="RemoveUser"
+                                              class="remove-user-form d-inline">
+                                            <input type="hidden" name="RemoveUserEmail" value="@u.Email" />
+
+                                            <button type="button"
+                                                    class="btn btn-sm btn-danger delete-user-btn"
+                                                    data-email="@u.Email">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+
+                            @* Leer‑State *@
+                            @if (!Model.RegularUsers.Any())
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-muted text-center py-4">
+                                        Keine regulären Benutzer gefunden.
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                    <!-- Alle Benutzer löschen (bleibt unverändert) -->
+                    <form method="post"
+                          asp-page-handler="DeleteAllUsers"
+                          class="delete-all-users-form mt-2">
+                        <button type="button"
+                                class="btn btn-danger w-100 delete-all-users-btn">
+                            Alle Benutzer löschen
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Rolle ändern
+        document.querySelectorAll('.role-select').forEach(sel => {
+            sel.dataset.orig = sel.value;
+            sel.addEventListener('change', async () => {
+                if (sel.disabled) { sel.value = sel.dataset.orig; return; }
+                const form = sel.closest('form');
+                const name = sel.dataset.adminName;
+                const role = sel.options[sel.selectedIndex].text;
+                const { isConfirmed } = await Swal.fire({
+                    title: 'Rolle ändern?',
+                    html: `Rolle von <strong>${name}</strong> wird zu <strong>${role}</strong>.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ja, ändern',
+                    cancelButtonText: 'Abbrechen',
+                    confirmButtonColor: '#3acc59'
+                });
+                if (isConfirmed) form.submit();
+                else sel.value = sel.dataset.orig;
+            });
+        });
+
+        // Einzelnen Administrator löschen
+        document.querySelectorAll('.remove-admin-form').forEach(form => {
+            form.addEventListener('submit', async e => {
+                const btn = form.querySelector('button[type="submit"]');
+                if (btn.disabled) { e.preventDefault(); return; }
+                e.preventDefault();
+                const email = form.querySelector('input[name="RemoveAdminEmail"]').value;
+                const { isConfirmed } = await Swal.fire({
+                    title: 'Administrator löschen?',
+                    html: `<strong>${email}</strong> wirklich entfernen?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ja, löschen',
+                    cancelButtonText: 'Abbrechen',
+                    confirmButtonColor: '#d33'
+                });
+                if (isConfirmed) form.submit();
+            });
+        });
+
+        // Einzelnen Benutzer löschen
+        document.querySelectorAll('.delete-user-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const email = btn.dataset.email;
+                const { isConfirmed } = await Swal.fire({
+                    title: 'Benutzer löschen?',
+                    html: `<strong>${email}</strong> wirklich löschen?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ja, löschen',
+                    cancelButtonText: 'Abbrechen',
+                    confirmButtonColor: '#d33'
+                });
+                if (isConfirmed) {
+                    btn.closest('form').submit();
+                }
+            });
+        });
+
+        // Alle Benutzer löschen
+        document.querySelector('.delete-all-users-btn')
+                .addEventListener('click', async () => {
+            const { isConfirmed } = await Swal.fire({
+                title: 'Alle Benutzer löschen?',
+                text: 'Diese Aktion kann nicht rückgängig gemacht werden.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ja, alle löschen',
+                cancelButtonText: 'Abbrechen',
+                confirmButtonColor: '#d33'
+            });
+            if (isConfirmed) {
+                document.querySelector('.delete-all-users-form').submit();
+            }
+        });
+
+                // ▼ Rolle für normale Benutzer ändern
+        document.querySelectorAll('.role-select-user').forEach(sel => {
+            sel.dataset.orig = sel.value;
+
+            sel.addEventListener('change', async () => {
+                const form = sel.closest('form');
+                const name = sel.dataset.userName;
+                const role = sel.options[sel.selectedIndex].text;
+
+                const { isConfirmed } = await Swal.fire({
+                    title: 'Rolle ändern?',
+                    html: `Rolle von <strong>${name}</strong> wird zu <strong>${role}</strong>.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ja, ändern',
+                    cancelButtonText: 'Abbrechen',
+                    confirmButtonColor: '#3acc59'
+                });
+
+                if (isConfirmed) form.submit();
+                else sel.value = sel.dataset.orig;
+            });
+        });
+
+    </script>
+}

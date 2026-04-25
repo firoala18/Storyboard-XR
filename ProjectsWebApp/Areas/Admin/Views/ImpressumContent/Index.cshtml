@@ -1,0 +1,118 @@
+﻿@model IEnumerable<ImpressumContent>
+@{
+    ViewData["Title"] = "Impressum-Managment";
+}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Impressum Inhalte verwalten</h2>
+        <a href="@Url.Action("Upsert", "ImpressumContent", new { area = "Admin" })" class="btn " style="background:black;color:white;">
+            <i class="fas fa-plus"></i> Inhalt hinzufügen
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 8%;">#</th>
+                    <th>Feld Type</th>
+                    <th>Title</th>
+                    <th style="width: 20%;">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody id="sortable">
+                @foreach (var item in Model.OrderBy(m => m.DisplayOrder)
+                .Select((content, index) => new { Content = content, Index = index }))
+                {
+                    <tr class="sortable-row" data-id="@item.Content.Id">
+                        <td class="text-center">
+                            <span class="badge bg-info">@((item.Index + 1))</span>
+                            <i class="bi bi-grip-vertical handle ms-2" style="cursor: move;"></i>
+                        </td>
+                        <td>@item.Content.SectionType</td>
+                        <td class="fw-bold">@item.Content.Title</td>
+                        <td class="text-center">
+                            <a href="@Url.Action("Upsert", "ImpressumContent", new { area = "Admin", id = item.Content.Id })"
+                               class="btn btn-warning mx-1">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            <button class="btn btn-danger delete-content" data-id="@item.Content.Id">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2></h2>
+        <a href="@Url.Action("Upsert", "ImpressumContent", new { area = "Admin" })" class="btn " style="background:black;color:white;">
+            <i class="fas fa-plus"></i> Inhalt hinzufügen
+        </a>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // Initialize the sortable functionality using jQuery UI
+            $("#sortable").sortable({
+                handle: ".handle",
+                update: function () {
+                    const ids = [];
+                    // Recalculate display order and update the badge text
+                    $("#sortable .sortable-row").each(function (index) {
+                        ids.push(parseInt($(this).data("id")));
+                        $(this).find(".badge").text(index + 1);
+                    });
+
+                    // Post the new order of IDs to the UpdateOrder action
+                    $.post('@Url.Action("UpdateOrder", "ImpressumContent", new { area = "Admin" })', { ids: ids })
+                        .done(function () {
+                            Swal.fire({
+                                title: "Success",
+                                text: "Display order updated successfully!",
+                                icon: "success",
+                                timer: 1000,
+                                showConfirmButton: false
+                            });
+                        })
+                        .fail(function () {
+                            Swal.fire({
+                                title: "Error",
+                                text: "An error occurred while updating the display order.",
+                                icon: "error"
+                            });
+                        });
+                }
+            }).disableSelection();
+
+            // Delete functionality using SweetAlert for confirmation
+            $(document).on('click', '.delete-content', function () {
+                const id = $(this).data("id");
+                const $row = $(this).closest('tr');
+
+                Swal.fire({
+                    title: 'Bist du sicher?',
+                    text: "Dieser Vorgang kann nicht rückgängig gemacht werden!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ja, löschen!'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $.post('@Url.Action("Delete", "ImpressumContent", new { area = "Admin" })', { id })
+                            .done(function (res) {
+                                if (res.success) {
+                                    $row.fadeOut(300, () => $row.remove());
+                                    Swal.fire('Gelöscht!', 'Die Sektion wurde erfolgreich entfernt.', 'success');
+                                } else {
+                                    Swal.fire('Fehler!', 'Sektion konnte nicht gelöscht werden.', 'error');
+                                }
+                            });
+                    }
+                });
+            });
+        });
+    </script>
+}

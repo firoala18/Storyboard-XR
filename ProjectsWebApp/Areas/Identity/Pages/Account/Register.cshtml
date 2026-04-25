@@ -1,0 +1,145 @@
+﻿@page
+@model ProjectsWebApp.Areas.Identity.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Registrierung";
+}
+
+<div class="container mt-5 d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="col-md-6">
+        <div class="card shadow-lg border-0" style="border-radius: 15px; overflow: hidden;">
+            <div class="card-header text-white text-center p-4" style="background-color: black;">
+                <h2>@ViewData["Title"]</h2>
+            </div>
+            <div class="card-body p-5">
+                <form id="registerForm" asp-route-returnUrl="@Model.ReturnUrl" method="post">
+                    <div asp-validation-summary="ModelOnly"
+                         class="text-danger mb-3"
+                         role="alert"></div>
+
+                    <!-- Einladungscode -->
+                    <div class="form-floating mb-3">
+                        <input asp-for="Input.InviteCode"
+                               class="form-control border-0 shadow-sm"
+                               placeholder="Einladungscode"
+                               style="border-radius: 10px;" />
+                        <label asp-for="Input.InviteCode">Einladungscode</label>
+                        <span asp-validation-for="Input.InviteCode"
+                              class="text-danger"></span>
+                    </div>
+
+                    <!-- Name -->
+                    <div class="form-floating mb-3">
+                        <input asp-for="Input.Name"
+                               class="form-control border-0 shadow-sm"
+                               autocomplete="given-name"
+                               placeholder="Max Mustermann"
+                               style="border-radius: 10px;" />
+                        <label asp-for="Input.Name">Name</label>
+                        <span asp-validation-for="Input.Name"
+                              class="text-danger"></span>
+                    </div>
+
+                    <!-- E-Mail -->
+                    <div class="form-floating mb-3">
+                        <input asp-for="Input.Email"
+                               class="form-control border-0 shadow-sm"
+                               autocomplete="username"
+                               placeholder="mail@beispiel.de"
+                               style="border-radius: 10px;" />
+                        <label asp-for="Input.Email">E-Mail</label>
+                        <span asp-validation-for="Input.Email"
+                              class="text-danger"></span>
+                    </div>
+
+                    <!-- Passwort -->
+                    <div class="form-floating mb-3">
+                        <input asp-for="Input.Password"
+                               type="password"
+                               class="form-control border-0 shadow-sm"
+                               autocomplete="new-password"
+                               placeholder="Passwort"
+                               style="border-radius: 10px;" />
+                        <label asp-for="Input.Password">Passwort</label>
+                        <span asp-validation-for="Input.Password"
+                              class="text-danger"></span>
+                    </div>
+
+                    <!-- Passwort bestätigen -->
+                    <div class="form-floating mb-4">
+                        <input asp-for="Input.ConfirmPassword"
+                               type="password"
+                               class="form-control border-0 shadow-sm"
+                               autocomplete="new-password"
+                               placeholder="Passwort wiederholen"
+                               style="border-radius: 10px;" />
+                        <label asp-for="Input.ConfirmPassword">Passwort bestätigen</label>
+                        <span asp-validation-for="Input.ConfirmPassword"
+                              class="text-danger"></span>
+                    </div>
+
+                    <!-- Abschicken -->
+                    <button id="registerSubmit"
+                            type="submit"
+                            class="btn btn-success w-100 py-2"
+                            style="border-radius: 10px; background-color: black; border: none;">
+                        <i class="fas fa-user-plus me-1"></i>Registrieren
+                    </button>
+
+                    <div class="mt-3 text-center">
+                        <a asp-page="./Login"
+                           asp-route-returnUrl="@Model.ReturnUrl"
+                           class="text-muted d-block">
+                            Haben Sie schon ein Konto? Anmelden
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.ExternalLogins?.Any() == true)
+    {
+        <div class="col-md-6 mt-4">
+            <div class="card shadow-lg border-0"
+                 style="border-radius: 15px;">
+                <div class="card-header bg-secondary text-white text-center p-4">
+                    <h3>Mit externem Dienst registrieren</h3>
+                </div>
+                <div class="card-body text-center">
+                    <form id="external-account"
+                          asp-page="./ExternalLogin"
+                          asp-route-returnUrl="@Model.ReturnUrl"
+                          method="post">
+                        @foreach (var provider in Model.ExternalLogins)
+                        {
+                            <button type="submit"
+                                    name="provider"
+                                    value="@provider.Name"
+                                    class="btn btn-primary w-100 mb-2 py-2"
+                                    style="border-radius: 10px;">
+                                Registrieren mit @provider.DisplayName
+                            </button>
+                        }
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    @if (TempData["RegisterError"] != null)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script>
+            Swal.fire({
+                icon: 'error',
+                title: 'Registrierung fehlgeschlagen',
+                text: '@TempData["RegisterError"]',
+                confirmButtonColor: '#3acc59'
+            });
+        </script>
+    }
+}

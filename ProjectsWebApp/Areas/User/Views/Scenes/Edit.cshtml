@@ -1,0 +1,288 @@
+@model ProjectsWebApp.Models.Scene
+@{
+    ViewData["Title"] = "Szene bearbeiten";
+    ViewBag.FullWidth = true;
+    var basePath = Context.Request.PathBase.HasValue ? Context.Request.PathBase.Value : "";
+}
+
+<style>
+    :root {
+        --green-400: #9fd62a;
+        --green-500: #89ba17;
+        --green-600: #77a514;
+        --green-700: #6a9312;
+        --ink: #111827;
+        --muted: #6b7280;
+        --line: #e6e8ef;
+        --bg-soft: #f8fafc;
+        --white: #fff;
+    }
+
+    .page-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 8px 0 20px
+    }
+
+        .page-head h2 {
+            font-size: 1.9rem;
+            margin: 0;
+            color: var(--ink);
+            letter-spacing: -.02em;
+            font-weight: 800
+        }
+
+    .edit-grid {
+        display: grid;
+        grid-template-columns: 1.2fr .8fr;
+        gap: 22px
+    }
+    @@media (max-width:900px) {
+        .edit-grid {
+            grid-template-columns: 1fr
+        }
+    }
+
+    .card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(16,24,40,.06)
+    }
+
+    .card-title {
+        font-weight: 800;
+        margin: 0 0 12px;
+        color: var(--ink);
+        font-size: 1.1rem;
+        letter-spacing: -.01em
+    }
+
+    .field {
+        margin-bottom: 14px
+    }
+
+        .field label {
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: block;
+            color: var(--ink);
+            font-size: 16px
+        }
+
+        .field small, .text-muted {
+            color: var(--muted);
+            font-size: 14px
+        }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px
+    }
+    @@media (max-width:700px) {
+        .form-row {
+            grid-template-columns: 1fr
+        }
+    }
+
+    .form-control, input[type=text], input[type=number], input[type=file], textarea, select {
+        background: #fff !important;
+        color: #111 !important;
+        border: 1px solid #cfd6e4 !important;
+        border-radius: 10px !important;
+        padding: 10px 12px !important;
+        min-height: 44px
+    }
+
+        .form-control:focus, input:focus, textarea:focus, select:focus {
+            border-color: var(--green-500) !important;
+            box-shadow: 0 0 0 .2rem rgba(137,186,23,.25) !important;
+            outline: none !important
+        }
+
+    .btn {
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-weight: 800;
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px
+    }
+
+    .btn-primary {
+        background: var(--green-500);
+        border: 1px solid var(--green-600);
+        color: #fff;
+        transition: background .2s,transform .2s,box-shadow .2s
+    }
+
+        .btn-primary:hover {
+            background: var(--green-600);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(137,186,23,.25)
+        }
+
+    .btn-secondary {
+        background: #fff;
+        border: 1px solid rgba(137,186,23,.35);
+        color: var(--green-700)
+    }
+
+        .btn-secondary:hover {
+            background: rgba(137,186,23,.08)
+        }
+
+    /* Preview card */
+    .preview-wrap {
+        position: sticky;
+        top: 12px;
+        align-self: start;
+        height: fit-content
+    }
+
+    .sb-card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 6px 18px rgba(16,24,40,.06);
+        display: grid;
+        grid-template-rows: auto 1fr
+    }
+
+    .sb-thumb {
+        background: #f5f7fb;
+        border-bottom: 1px solid #eef1f6;
+        aspect-ratio: 16/9;
+        display: flex;
+        align-items: center;
+        justify-content: center
+    }
+
+        .sb-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block
+        }
+
+    .sb-main {
+        padding: 14px 16px 16px;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        row-gap: 8px
+    }
+
+    .sb-title {
+        font-weight: 800;
+        color: var(--ink);
+        letter-spacing: .2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        align-self: center
+    }
+</style>
+
+<div class="page-head">
+    <h2>Szene bearbeiten</h2>
+    <a asp-area="User" asp-controller="Storyboards" asp-action="Details" asp-route-id="@Model.StoryboardId" asp-route-sceneId="@Model.Id" class="btn btn-secondary">Zur Übersicht</a>
+</div>
+
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="edit-grid">
+    @Html.AntiForgeryToken()
+
+    <!-- LEFT -->
+    <div>
+        <div class="card">
+            <h4 class="card-title">Szenen-Details</h4>
+
+            <div class="form-row">
+                <div class="field">
+                    <label for="number">Nummer</label>
+                    <input id="number" name="number" type="number" min="1" step="1" value="@Model.Number" class="form-control" />
+                </div>
+                <div class="field">
+                    <label for="name">Name (optional)</label>
+                    <input id="name" name="name" value="@Model.Name" class="form-control" placeholder="1. Szene / Intro" />
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="image">Neues Bild (optional)</label>
+                <input id="image" type="file" name="image" class="form-control" accept=".png,.jpg,.jpeg,.webp,.gif" />
+                <small class="text-muted">Wenn du ein neues Bild auswählst, wird das alte ersetzt.</small>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:6px">
+                <button class="btn btn-primary" type="submit">Speichern</button>
+                <a asp-area="User" asp-controller="Storyboards" asp-action="Details" asp-route-id="@Model.StoryboardId" asp-route-sceneId="@Model.Id" class="btn btn-secondary">Abbrechen</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT -->
+    <aside class="preview-wrap">
+        <div class="sb-card">
+            <div class="sb-thumb">
+                <img id="pvImg" alt="Szenenbild"
+                     src="@(string.IsNullOrWhiteSpace(Model.ImagePath) ? (basePath + "/img/placeholder.svg") : (basePath + Model.ImagePath))"
+                     onerror="this.src='@(basePath + "/img/placeholder.svg")'" />
+            </div>
+            <div class="sb-main">
+                <div class="sb-title" id="pvTitle">@((string.IsNullOrWhiteSpace(Model.Name) ? ($"{Model.Number}. Szene") : ($"{Model.Number}. {Model.Name}")))</div>
+                <div class="text-muted" style="color:var(--muted);font-size:.92rem">Storyboard-ID: @Model.StoryboardId • Szene-ID: @Model.Id</div>
+                <div></div>
+            </div>
+        </div>
+    </aside>
+</form>
+
+@section Scripts {
+    <script>
+        (function(){
+          const numIn=document.getElementById('number');
+          const nameIn=document.getElementById('name');
+          const imgIn=document.getElementById('image');
+          const pvTitle=document.getElementById('pvTitle');
+          const pvImg=document.getElementById('pvImg');
+
+          function updateTitle(){
+            const n=Math.max(1,parseInt((numIn.value||'1'),10));
+            const nm=(nameIn.value||'').trim();
+            pvTitle.textContent = nm ? `${n}. ${nm}` : `${n}. Szene`;
+          }
+          numIn?.addEventListener('input',updateTitle);
+          nameIn?.addEventListener('input',updateTitle);
+
+          imgIn?.addEventListener('change',()=>{
+            const f=imgIn.files&&imgIn.files[0];
+            if(!f) return;
+
+            const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+            if (f.size > MAX_SIZE) {
+              const msg = 'Das Bild ist zu groß. Maximal 2 MB pro Bild erlaubt.';
+              if (window.SB && SB.alert) SB.alert(msg, 'error', 'Bild zu groß');
+              else if (window.Swal) Swal.fire({ icon: 'error', title: 'Bild zu groß', text: msg });
+              else alert(msg);
+              imgIn.value='';
+              return;
+            }
+
+            if(!/\.(png|jpe?g|webp|gif)$/i.test(f.name)){
+              if (window.SB && SB.alert) SB.alert('Nur PNG/JPG/WebP/GIF erlaubt.', 'error', 'Ungültige Datei');
+              else alert('Nur PNG/JPG/WebP/GIF erlaubt.');
+              imgIn.value='';
+              return;
+            }
+
+            const rd=new FileReader(); rd.onload=e=>pvImg.src=e.target.result; rd.readAsDataURL(f);
+          });
+        })();
+    </script>
+}

@@ -1,0 +1,461 @@
+@model ProjectsWebApp.Models.Storyboard
+@{
+    ViewData["Title"] = "Reflexion-Liste – " + (string.IsNullOrWhiteSpace(Model.Title) ? "Storyboard" : Model.Title);
+    ViewBag.FullWidth = true;
+
+    var scenes = (Model.Scenes ?? new List<ProjectsWebApp.Models.Scene>())
+        .OrderBy(s => s.Number)
+        .ThenBy(s => s.Id)
+        .ToList();
+
+    var token = ViewBag.Token as string;
+    var detailsUrl = Url.Action(
+        "Details",
+        "Storyboards",
+        new { area = "User", id = Model.Id, t = string.IsNullOrWhiteSpace(token) ? null : token }
+    );
+}
+
+<style>
+    .prompt-page {
+        width: 100%;
+    }
+
+    .prompt-topbar {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: .5rem;
+        margin: 10px 0 18px;
+    }
+
+    .prompt-actions-left,
+    .prompt-actions-right {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .prompt-title h3 {
+        margin: 0;
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #111827;
+        letter-spacing: -.01em;
+    }
+
+    .prompt-subtitle {
+        font-size: .9rem;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+
+    .prompt-page .btn {
+        border-radius: 10px;
+        padding: 8px 16px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+    }
+
+    .prompt-page .btn-secondary {
+        background: #fff;
+        border: 1px solid #d4d4d8;
+        color: #111827;
+    }
+
+    .prompt-page .btn-secondary:hover {
+        background: #f9fafb;
+        border-color: #a1a1aa;
+        color: #020617;
+    }
+
+    .prompt-scene-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 10px;
+    }
+
+    .prompt-scene-card {
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        padding: 12px 14px;
+        background: #fff;
+        box-shadow: 0 4px 12px rgba(15,23,42,.04);
+        margin: 0;
+    }
+
+    .prompt-scene-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        margin: 0;
+        list-style: none;
+        cursor: pointer;
+    }
+
+    .prompt-scene-header::-webkit-details-marker {
+        display: none;
+    }
+
+    .prompt-scene-title {
+        font-weight: 700;
+        color: #111827;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+
+    .prompt-scene-caret {
+        display: inline-block;
+        font-size: 1.1rem;
+        color: #6b7280;
+        margin-right: .35rem;
+        transition: transform .15s ease;
+    }
+
+    details[open] .prompt-scene-caret {
+        transform: rotate(90deg);
+    }
+
+    .prompt-scene-meta {
+        font-size: .8rem;
+        color: #6b7280;
+    }
+
+    .prompt-marker-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .prompt-marker-item {
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        padding: 6px 8px;
+        background: #f9fafb;
+    }
+
+    .prompt-marker-heading {
+        font-size: .85rem;
+        font-weight: 700;
+        color: #4b5563;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+    }
+
+    .prompt-marker-item .prompt-insert {
+        font-size: .8rem;
+        padding: 4px 12px;
+        border-radius: 999px;
+        flex-shrink: 0;
+    }
+
+    .prompt-marker-body {
+        font-size: .9rem;
+        color: #111827;
+    }
+
+    .richtext { line-height: 1.6; }
+    .richtext p { margin: 0 0 .4rem; }
+    .richtext ul, .richtext ol { margin: .4rem 0; padding-left: 1.25rem; }
+    .richtext li { margin: .2rem 0; }
+    .richtext a { color: #2563eb; text-decoration: underline; }
+    .richtext blockquote { margin: .5rem 0; padding-left: .75rem; border-left: 3px solid #e5e7eb; color: #374151; }
+
+    .prompt-empty {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px dashed #e5e7eb;
+        background: #f9fafb;
+        color: #6b7280;
+        font-size: .95rem;
+    }
+
+    .prompt-composer {
+        margin-top: 24px;
+        position: relative;
+    }
+
+    .prompt-composer-actions {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        display: flex;
+        gap: 6px;
+        z-index: 20;
+    }
+
+    .prompt-composer-actions .composer-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid #e5e7eb;
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #4b5563;
+        padding: 0;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(15,23,42,.08);
+        transition: background .15s ease, border-color .15s ease, transform .08s ease;
+    }
+
+    .prompt-composer-actions .composer-btn:hover {
+        background: #f9fafb;
+        border-color: #d4d4d8;
+        transform: translateY(-1px);
+    }
+
+    .prompt-composer .note-editor {
+        position: relative;
+    }
+
+    .prompt-composer-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 4px;
+    }
+
+    .prompt-composer-note {
+        font-size: .9rem;
+        color: #6b7280;
+        margin-bottom: 10px;
+    }
+
+    @@media (max-width: 640px) {
+        .prompt-actions-left a,
+        .prompt-actions-right a {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="container-fluid px-0 mt-4 prompt-page">
+    <div class="prompt-topbar">
+        <div class="prompt-actions-left">
+            @if (!string.IsNullOrWhiteSpace(detailsUrl))
+            {
+                <a href="@detailsUrl" class="btn btn-secondary" title="Zurück zum Editor">
+                    <i class="bi bi-arrow-left"></i>
+                    <span class="d-none d-sm-inline">Editor</span>
+                </a>
+            }
+        </div>
+        <div class="prompt-title mt-4">
+            <h3>Reflexion-Liste</h3>
+            <div class="prompt-subtitle">
+                Alle Texte aus dem Feld "Reflexion – Notizen", gruppiert nach Szenen dieses Storyboards.
+            </div>
+        </div>
+    </div>
+
+    @{
+        var anyReflexions = false;
+    }
+
+    <div class="prompt-scene-list">
+        @foreach (var sc in scenes)
+        {
+            var markersWithReflexion = (sc.Markers ?? new List<ProjectsWebApp.Models.Marker>())
+                .Where(m => !string.IsNullOrWhiteSpace(m.Reflexion))
+                .OrderBy(m => m.Number)
+                .ThenBy(m => m.Id)
+                .ToList();
+
+            if (!markersWithReflexion.Any())
+            {
+                continue;
+            }
+
+            anyReflexions = true;
+            var sceneLabel = string.IsNullOrWhiteSpace(sc.Name)
+                ? $"{sc.Number}. Szene"
+                : $"{sc.Number}. {sc.Name}";
+            var markerCountLabel = markersWithReflexion.Count == 1
+                ? "1 Eintrag"
+                : $"{markersWithReflexion.Count} Einträge";
+        <details class="prompt-scene-card" open>
+            <summary class="prompt-scene-header">
+                <div class="prompt-scene-title">
+                    <span class="prompt-scene-caret" aria-hidden="true">▸</span>
+                    <i class="fas fa-film"></i>
+                    <span>@sceneLabel</span>
+                </div>
+                <div class="prompt-scene-meta">
+                    @markerCountLabel
+                </div>
+            </summary>
+            <div class="prompt-marker-list">
+                @foreach (var m in markersWithReflexion)
+                {
+                    <article class="prompt-marker-item">
+                        <div class="prompt-marker-heading">
+                            <span>Marker #@m.Number</span>
+                            <button type="button" class="btn btn-secondary btn-sm prompt-insert">Einfügen</button>
+                        </div>
+                        <div class="prompt-marker-body richtext">
+                            @Html.Raw(m.Reflexion)
+                        </div>
+                    </article>
+                }
+            </div>
+        </details>
+        }
+    </div>
+
+    <div class="prompt-composer mb-5">
+        <div class="prompt-composer-title">Reflexion-Editor</div>
+        <div class="prompt-composer-note">
+            Wähle eine oder mehrere Reflexionen oben aus und füge sie hier zusammen. Jeder Klick auf "Einfügen" hängt den Text unten an.
+        </div>
+        <div class="prompt-composer-actions">
+            <button type="button" class="composer-btn composer-copy" title="Editor-Inhalt kopieren">
+                <i class="bi bi-clipboard"></i>
+            </button>
+            <button type="button" class="composer-btn composer-clear" title="Editor leeren">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+        <textarea id="reflexionComposer"></textarea>
+    </div>
+
+    @if (!anyReflexions)
+    {
+        <div class="prompt-empty">
+            Für dieses Storyboard wurden bisher keine Einträge im Feld "Reflexion – Notizen" erfasst.
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
+    <script>
+        (function(){
+            if (!window.jQuery) return;
+            var $ = window.jQuery;
+
+            var $composer = $('#reflexionComposer');
+            $composer.summernote({
+                placeholder: 'Hier kannst du deine zusammengestellten Reflexionen aufbauen …',
+                height: 220,
+                disableDragAndDrop: true,
+                toolbar: [
+                    ['style', ['bold', 'italic', 'underline', 'clear']],
+                    ['para', ['ul', 'ol', 'paragraph']],
+                    ['insert', ['link']],
+                    ['view', ['fullscreen', 'codeview']]
+                ]
+            });
+
+            // attach copy / clear buttons to the editor toolbar
+            (function () {
+                var root = document.querySelector('.prompt-composer');
+                if (!root) return;
+                var actions = root.querySelector('.prompt-composer-actions');
+                if (!actions) return;
+
+                var $editor = $composer.next('.note-editor');
+                if ($editor.length) {
+                    var $toolbar = $editor.find('.note-toolbar');
+                    if ($toolbar.length) {
+                        $toolbar.append(actions);
+                    }
+                }
+
+                var copyBtn = actions.querySelector('.composer-copy');
+                var clearBtn = actions.querySelector('.composer-clear');
+
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', function () {
+                        if (!$composer.next('.note-editor').length) return;
+                        var html = $composer.summernote('code') || '';
+                        var tmp = document.createElement('div');
+                        tmp.innerHTML = html;
+                        var text = (tmp.textContent || tmp.innerText || '').replace(/\u00A0/g, ' ').trim();
+                        if (!text) return;
+
+                        var copyPromise;
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            copyPromise = navigator.clipboard.writeText(text).catch(function () { });
+                        } else {
+                            copyPromise = new Promise(function (resolve) {
+                                var ta = document.createElement('textarea');
+                                ta.style.position = 'fixed';
+                                ta.style.opacity = '0';
+                                ta.value = text;
+                                document.body.appendChild(ta);
+                                ta.select();
+                                try { document.execCommand('copy'); } catch (e) { }
+                                document.body.removeChild(ta);
+                                resolve();
+                            });
+                        }
+
+                        copyPromise.then(function () {
+                            if (window.SB && SB.toast) {
+                                SB.toast('In Zwischenablage kopiert.', 'success');
+                            }
+                        });
+                    });
+                }
+
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', function () {
+                        if (!$composer.next('.note-editor').length) return;
+                        if (window.SB && SB.confirm) {
+                            SB.confirm('Der gesamte Inhalt des Editors wird gelöscht.', {
+                                title: 'Editor leeren?',
+                                icon: 'warning',
+                                confirmButtonText: 'Ja, löschen',
+                                cancelButtonText: 'Abbrechen'
+                            }).then(function (confirmed) {
+                                if (!confirmed) return;
+                                $composer.summernote('code', '');
+                                if (window.SB && SB.toast) {
+                                    SB.toast('Editor geleert.', 'success');
+                                }
+                            });
+                        } else {
+                            $composer.summernote('code', '');
+                        }
+                    });
+                }
+            })();
+
+            function appendReflexionHtml(html){
+                if (!$composer.next('.note-editor').length) return;
+                var current = $composer.summernote('code') || '';
+                if (!current || current === '<p><br></p>') {
+                    $composer.summernote('code', html);
+                } else {
+                    $composer.summernote('code', current + '<p><br></p>' + html);
+                }
+            }
+
+            document.querySelectorAll('.prompt-marker-item .prompt-insert').forEach(function(btn){
+                btn.addEventListener('click', function(){
+                    var item = btn.closest('.prompt-marker-item');
+                    if (!item) return;
+                    var body = item.querySelector('.prompt-marker-body');
+                    if (!body) return;
+                    appendReflexionHtml(body.innerHTML);
+                });
+            });
+        })();
+    </script>
+}

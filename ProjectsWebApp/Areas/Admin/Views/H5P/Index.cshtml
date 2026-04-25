@@ -1,0 +1,184 @@
+@model IEnumerable<ProjectsWebApp.Models.H5PContent>
+@{
+    ViewData["Title"] = "H5P-Sammlung – Admin";
+    var total = Model.Count();
+}
+
+<style>
+    .h5p-hero { border:1px solid #eef1f4; border-radius:16px; background:linear-gradient(135deg,#f8fffb,#f2fbf6); padding:1.25rem 1.5rem; box-shadow:0 10px 24px rgba(16,24,40,.06); margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; }
+    .h5p-hero-left { display:flex; align-items:center; gap:1rem; }
+    .h5p-hero-icon { width:52px; height:52px; border-radius:14px; background:rgba(137,186,23,.15); display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:#89ba17; }
+    .h5p-hero h1 { font-size:1.5rem; font-weight:700; margin:0; color:#0f172a; letter-spacing:.2px; }
+    .h5p-hero .h5p-count { font-size:.85rem; color:#6b7280; font-weight:600; background:rgba(137,186,23,.1); padding:2px 10px; border-radius:999px; font-family:'JetBrains Mono', monospace; }
+    .btn-h5p-create { background:linear-gradient(135deg,#89ba17,#6f9a10); color:#fff; border:none; border-radius:12px; padding:.55rem 1.25rem; font-weight:600; font-size:.9rem; box-shadow:0 6px 16px rgba(137,186,23,.25); transition:filter .2s, transform .2s; display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; }
+    .btn-h5p-create:hover { filter:brightness(1.06); transform:translateY(-1px); color:#fff; }
+    .h5p-toolbar { border:1px solid #eef1f4; border-radius:14px; background:#fff; padding:.6rem; box-shadow:0 10px 24px rgba(16,24,40,.06); margin-bottom:1rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .h5p-search { position:relative; flex:1; min-width:200px; }
+    .h5p-search input { width:100%; height:40px; padding-left:2.25rem; padding-right:.75rem; border:2px solid #e4e8ec; border-radius:10px; font-size:.85rem; color:#1a1d23; transition:border-color .2s, box-shadow .2s; background:#fff; }
+    .h5p-search input:focus { border-color:#89ba17; outline:none; box-shadow:0 0 0 .2rem rgba(137,186,23,.15); }
+    .h5p-search-icon { position:absolute; left:.65rem; top:50%; transform:translateY(-50%); font-size:1rem; color:#6b7280; pointer-events:none; }
+    .h5p-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:1rem; }
+    .h5p-card { border:1px solid #eef1f4; border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 12px 28px rgba(16,24,40,.06); transition:transform .18s, box-shadow .18s, border-color .18s; display:flex; flex-direction:column; height:100%; }
+    .h5p-card:hover { transform:translateY(-4px); box-shadow:0 20px 40px rgba(16,24,40,.1); border-color:#dff4e7; }
+    .h5p-card-media { height:150px; overflow:hidden; border-bottom:1px solid #eef2f7; position:relative; background:linear-gradient(135deg, rgba(137,186,23,.08), rgba(137,186,23,.02)); }
+    .h5p-card-media img { width:100%; height:100%; object-fit:cover; transition:transform .3s; }
+    .h5p-card:hover .h5p-card-media img { transform:scale(1.05); }
+    .h5p-card-media-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.5rem; color:#89ba17; opacity:.35; }
+    .h5p-card-status { position:absolute; top:.6rem; right:.6rem; display:inline-flex; align-items:center; gap:.3rem; font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 10px; border-radius:999px; backdrop-filter:blur(6px); }
+    .h5p-card-status.shared { background:rgba(34,197,94,.18); color:#166534; }
+    .h5p-card-status.draft  { background:rgba(148,163,184,.2); color:#475569; }
+    .h5p-card-status .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+    .h5p-card-status.shared .dot { background:#22c55e; }
+    .h5p-card-status.draft  .dot { background:#94a3b8; }
+    .h5p-card-body { padding:1rem 1.1rem; flex:1; display:flex; flex-direction:column; gap:.4rem; }
+    .h5p-card-title { font-weight:700; font-size:1rem; color:#0f172a; line-height:1.25; }
+    .h5p-card-desc  { color:#475569; font-size:.85rem; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .h5p-card-meta  { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:auto; padding-top:.35rem; }
+    .h5p-tag { font-size:.62rem; font-weight:600; padding:2px 8px; border-radius:999px; white-space:nowrap; background:rgba(137,186,23,.12); color:#3b5f0a; border:1px solid rgba(137,186,23,.2); }
+    .h5p-card-foot { padding:.6rem .75rem .75rem; border-top:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; }
+    .h5p-card-date { font-size:.72rem; color:#94a3b8; }
+    .h5p-card-actions { display:flex; align-items:center; gap:.3rem; }
+    .h5p-act-btn { width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #eef1f4; background:#fff; color:#475569; font-size:.85rem; transition:all .15s; cursor:pointer; text-decoration:none; }
+    .h5p-act-btn:hover { background:#f1f5f9; border-color:#cbd5e1; color:#0f172a; }
+    .h5p-act-btn.danger { color:#dc2626; }
+    .h5p-act-btn.danger:hover { background:#fef2f2; border-color:#fecaca; }
+    .h5p-act-btn.publish { color:#16a34a; }
+    .h5p-act-btn.publish:hover { background:#f0fdf4; border-color:#86efac; }
+    .h5p-act-btn.publish.active { background:#dcfce7; border-color:#4ade80; color:#166534; }
+    .h5p-empty { padding:3rem 1rem; text-align:center; color:#64748b; }
+    .h5p-empty-icon { width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg, rgba(137,186,23,.1), rgba(137,186,23,.04)); display:inline-flex; align-items:center; justify-content:center; font-size:2rem; color:#89ba17; margin-bottom:1rem; }
+    @@media (max-width:640px) { .h5p-hero { flex-direction:column; align-items:flex-start; } .h5p-grid { grid-template-columns:1fr; } }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="h5p-hero">
+        <div class="h5p-hero-left">
+            <div class="h5p-hero-icon"><i class="bi bi-collection-play"></i></div>
+            <div>
+                <h1>H5P-Sammlung</h1>
+                <span class="h5p-count">@total Einträge</span>
+            </div>
+        </div>
+        <a asp-action="Create" class="btn-h5p-create">
+            <i class="bi bi-plus-lg"></i> H5P
+        </a>
+    </div>
+
+    @if (TempData["success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="h5p-toolbar">
+        <div class="h5p-search">
+            <i class="bi bi-search h5p-search-icon"></i>
+            <input type="text" id="h5pSearch" placeholder="Suchen …" autocomplete="off" />
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="h5p-empty">
+            <div class="h5p-empty-icon"><i class="bi bi-collection-play"></i></div>
+            <h5 class="fw-semibold mb-1">Noch keine H5P-Inhalte</h5>
+            <p class="small mb-3">Erstellen Sie Ihren ersten interaktiven Inhalt.</p>
+            <a asp-action="Create" class="btn-h5p-create"><i class="bi bi-plus-lg"></i> Jetzt erstellen</a>
+        </div>
+    }
+    else
+    {
+        <div class="h5p-grid" id="h5pGrid">
+            @foreach (var item in Model)
+            {
+                <div class="h5p-card" data-title="@item.Title.ToLower()">
+                    <div class="h5p-card-media">
+                        @if (!string.IsNullOrEmpty(item.ImagePath))
+                        {
+                            <img src="@Url.Content("~" + item.ImagePath)" alt="@item.Title" />
+                        }
+                        else
+                        {
+                            <div class="h5p-card-media-ph"><i class="bi bi-collection-play"></i></div>
+                        }
+                        <span class="h5p-card-status @(item.IsPublished ? "shared" : "draft")">
+                            <span class="dot"></span>
+                            @(item.IsPublished ? "Veröffentlicht" : "Entwurf")
+                        </span>
+                    </div>
+                    <div class="h5p-card-body">
+                        <div class="h5p-card-title">@item.Title</div>
+                        <div class="h5p-card-desc">@(item.Description ?? "Keine Beschreibung")</div>
+                        @if (!string.IsNullOrWhiteSpace(item.Keywords))
+                        {
+                            <div class="h5p-card-meta">
+                                @foreach (var kw in item.Keywords.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(4))
+                                {
+                                    <span class="h5p-tag">#@kw</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="h5p-card-foot">
+                        <span class="h5p-card-date"><i class="bi bi-clock me-1"></i>@item.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")</span>
+                        <div class="h5p-card-actions">
+                            <form asp-action="TogglePublish" asp-route-id="@item.Id" method="post" class="d-inline js-publish-form">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="h5p-act-btn publish @(item.IsPublished ? "active" : "")"
+                                        title="@(item.IsPublished ? "Entwurf machen" : "Veröffentlichen")">
+                                    <i class="bi @(item.IsPublished ? "bi-eye-fill" : "bi-eye-slash")"></i>
+                                </button>
+                            </form>
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="h5p-act-btn" title="Bearbeiten">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="button" class="h5p-act-btn danger js-delete-btn" data-name="@item.Title" title="Löschen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('h5pSearch');
+    const grid = document.getElementById('h5pGrid');
+    if (input && grid) {
+        input.addEventListener('input', () => {
+            const q = input.value.trim().toLowerCase();
+            grid.querySelectorAll('.h5p-card').forEach(c => {
+                c.style.display = !q || c.dataset.title.includes(q) ? '' : 'none';
+            });
+        });
+    }
+
+    document.querySelectorAll('.js-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const name = btn.dataset.name || 'H5P-Inhalt';
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'H5P-Inhalt löschen?',
+                    text: name + ' wird dauerhaft entfernt.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ja, löschen',
+                    cancelButtonText: 'Abbrechen',
+                    confirmButtonColor: '#d33'
+                });
+                if (res.isConfirmed) btn.closest('form')?.submit();
+            } else {
+                if (confirm(name + ' löschen?')) btn.closest('form')?.submit();
+            }
+        });
+    });
+});
+</script>

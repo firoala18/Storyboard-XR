@@ -1,0 +1,92 @@
+﻿@{
+    if (ViewData.TryGetValue("ParentLayout", out var parentLayout) && parentLayout != null)
+    {
+        Layout = parentLayout.ToString();
+    }
+    else
+    {
+        Layout = "/Views/Shared/_Layout.cshtml";
+    }
+}
+
+<style>
+    .account-header {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        color: #2c3e50;
+    }
+
+    .account-subheader {
+        font-size: 1.2rem;
+        color: #6c757d;
+        margin-bottom: 2rem;
+    }
+
+    .account-container {
+        background-color: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        padding: 2rem;
+    }
+
+    .account-sidebar {
+        border-right: 1px solid #eaeaea;
+        padding-right: 2rem;
+    }
+
+    .account-sidebar nav a {
+        display: block;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        color: #495057;
+        background-color: #f8f9fa;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .account-sidebar nav a.active,
+    .account-sidebar nav a:hover {
+        background-color: #90bc14;
+        color: white;
+    }
+
+    .account-content {
+        padding-left: 2rem;
+    }
+
+    @@media (max-width: 768px) {
+        .account-sidebar {
+            border-right: none;
+            padding-right: 0;
+            margin-bottom: 2rem;
+        }
+
+        .account-content {
+            padding-left: 0;
+        }
+    }
+</style>
+
+<div class="container mt-5">
+    <h1 class="account-header">Kontoverwaltung</h1>
+    <p class="account-subheader">Hier können Sie Ihre Kontoeinstellungen und persönlichen Daten anpassen.</p>
+
+    <div class="row account-container">
+        <div class="col-md-3 account-sidebar">
+            <nav>
+                <partial name="_ManageNav" />
+            </nav>
+        </div>
+
+        <div class="col-md-9 account-content">
+            @RenderBody()
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @RenderSection("Scripts", required: false)
+}

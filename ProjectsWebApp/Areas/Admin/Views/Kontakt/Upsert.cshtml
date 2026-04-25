@@ -1,0 +1,142 @@
+﻿@model KontaktCard
+
+@{
+    ViewData["Title"] = Model.Id == 0 ? "Kontakt-Karten-Managment" : "Kontakt-Karten-Managment";
+}
+
+<style>
+    .container {
+        max-width: 700px;
+        margin-top: 30px;
+    }
+
+    .card {
+        padding: 20px;
+        border-radius: 8px;
+        background-color: #fff;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .profile-preview {
+        text-align: center;
+        margin-bottom: 15px;
+    }
+
+        .profile-preview img {
+            width: 200px;
+            height: auto;
+            border-radius: 30px;
+            border: 2px solid black;
+        }
+
+    .btn-save {
+        background-color: black;
+        color: white;
+    }
+
+        .btn-save:hover {
+            background: white;
+            color:black;
+            border: 1px solid black;
+        }
+
+</style>
+
+<div class="container">
+    <div class="card">
+        <h2 class="text-center">@(Model.Id == 0 ? "Kontakt-Karte hinzufügen" : "Kontakt-Karte bearbeiten")</h2>
+        <form asp-action="Upsert" method="post" enctype="multipart/form-data">
+            <input type="hidden" asp-for="Id" />
+
+            <!-- Image Preview -->
+            <div class="form-group profile-preview">
+                @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                {
+                    <img id="imagePreview" src="@Model.ImageUrl" alt="Profile Image">
+                }
+                else
+                {
+                    <img id="imagePreview" src="https://via.placeholder.com/200" alt="Default Image">
+                }
+                <input type="hidden" asp-for="ImageUrl" />
+            </div>
+
+            <!-- Image Upload -->
+            <div class="form-group mb-3">
+                <label for="ImageFile" class="form-label"><strong>Profilbild (optional)</strong></label>
+                <input type="file" class="form-control" name="ImageFile" id="ImageFile" accept="image/*" onchange="previewImage(event)">
+            </div>
+
+            <!-- Function -->
+            <div class="form-group mb-3">
+                <label for="Funktion" class="form-label"><strong>Funktion (optional)</strong></label>
+                <textarea asp-for="Funktion" class="form-control" rows="3" placeholder="Funktion eingeben"></textarea>
+            </div>
+
+            <!-- Name -->
+            <div class="form-group mb-3">
+                <label for="Name" class="form-label"><strong>Name* (Pflicht)</strong></label>
+                <input type="text" asp-for="Name" class="form-control" required placeholder="Name eingeben">
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+
+            <!-- Kontakt Daten (Textarea) -->
+            <div class="form-group mb-3">
+                <label for="KontaktDatenHtml" class="form-label"><strong>Kontakt Daten (optional)</strong></label>
+                @* <textarea asp-for="KontaktDatenHtml" class="form-control" rows="8" placeholder="z.B. Projektleitung, Telefonnummer, Adresse..."></textarea> *@
+                <textarea id="Content" asp-for="KontaktDatenHtml" class="form-control" rows="10" placeholder="z.B. Projektleitung, Telefonnummer, Adresse...">@Model.KontaktDatenHtml</textarea>
+                <span asp-validation-for="KontaktDatenHtml" class="text-danger"></span>
+            </div>
+
+
+            <!-- Display Order -->
+         @*    <div class="form-group mb-3">
+                <label for="DisplayOrder" class="form-label"><strong>Anzeigereihenfolge*</strong></label>
+                <input type="number" asp-for="DisplayOrder" class="form-control" required>
+                <span asp-validation-for="DisplayOrder" class="text-danger"></span>
+            </div> *@
+
+            <!-- Save Button -->
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-save w-50"><i class="bi bi-check-lg me-1"></i> Speichern</button>
+            </div>
+
+            <div class="text-center mt-2">
+                <a href="@Url.Action("Index", "Kontakt")" class="btn btn-secondary"> Abbrechen</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
+    <script>
+        function previewImage(event) {
+            const reader = new FileReader();
+            reader.onload = function () {
+                document.getElementById('imagePreview').src = reader.result;
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        }
+
+        (function(){
+          document.addEventListener('DOMContentLoaded', function(){
+            const el = document.querySelector('#Content');
+            if (!el || !window.jQuery) return;
+            window.jQuery(el).summernote({
+              height: 300,
+              placeholder: 'Kontakt Daten eingeben …',
+              toolbar: [
+                ['style', ['bold','italic','underline','clear']],
+                ['font', ['fontsize','color']],
+                ['para', ['ul','ol','paragraph']],
+                ['insert', ['link']],
+                ['view', ['codeview']]
+              ]
+            });
+          });
+        })();
+    </script>
+}

@@ -1,0 +1,122 @@
+﻿@page
+@model LoginWithRecoveryCodeModel
+@{
+    ViewData["Title"] = "Recovery code verification";
+    var returnUrl = (string)ViewData["ReturnUrl"] ?? Url.Content("~/");
+}
+
+<!-- —————————————————  STYLES  ————————————————— -->
+<style>
+    .login-shell {
+        min-height: 90vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .card-login {
+        width: 420px;
+        background: #fff;
+        border-radius: 18px;
+        padding: 32px 36px;
+        box-shadow: 0 15px 40px rgba(0,0,0,.08);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .card-login h2 {
+        font-weight: 700;
+        margin-bottom: 28px;
+        text-align: center;
+    }
+    .form-group {
+        margin-bottom: 18px;
+    }
+    .input-wrap {
+        display: flex;
+        align-items: center;
+        height: 48px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 0 14px;
+        transition: .18s;
+    }
+    .input-wrap:focus-within {
+        border-color: #3388ff;
+        box-shadow: 0 0 0 2px rgba(51,136,255,.25);
+    }
+    .input-wrap svg {
+        flex: 0 0 20px;
+        fill: #a8acb2;
+    }
+    .form-control {
+        border: 0;
+        outline: none;
+        flex: 1;
+        height: 100%;
+        padding-left: 10px;
+        background: transparent;
+    }
+    .btn-primary-lg {
+        background: #151717;
+        border: 0;
+        width: 100%;
+        height: 48px;
+        border-radius: 12px;
+        color: #fff;
+        font-weight: 600;
+        margin-top: 10px;
+    }
+    .btn-primary-lg:hover {
+        background: #23272a;
+    }
+    .note {
+        text-align: center;
+        font-size: .9rem;
+        margin: 20px 0 6px;
+    }
+    .link-sm {
+        font-size: .9rem;
+        color: #3388ff;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .link-sm:hover {
+        text-decoration: underline;
+    }
+    .validation-summary-errors {
+        font-size: .9rem;
+    }
+</style>
+
+<div class="login-shell">
+    <form method="post" asp-route-returnUrl="@returnUrl" class="card-login">
+        <h2>@ViewData["Title"]</h2>
+
+        <div asp-validation-summary="ModelOnly" class="text-danger validation-summary-errors"></div>
+
+        <!-- Recovery Code Input -->
+        <div class="form-group">
+            <div class="input-wrap">
+                <!-- key icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="0 0 576 512">
+                    <path d="M336 128c0-53.02-42.98-96-96-96S144 74.98 144 128s42.98 96 96 96c12.78 0 25-2.56 36.5-7.48l109.47 109.47c12.49 12.49 32.75 12.49 45.25 0l32-32c12.49-12.49 12.49-32.75 0-45.24L280.48 169.5C285.44 157.99 288 145.78 288 128zM0 192v128c0 64 64 96 96 96h112c14.23 0 28.24-4.56 40-13.03l115-115-32-32-115 115C180.56 324.24 176 310.23 176 296V184c0-31.36-32-48-32-48H96c-32 0-96 32-96 56z"/>
+                </svg>
+                <input asp-for="Input.RecoveryCode"
+                       class="form-control"
+                       placeholder="Recovery Code"
+                       autocomplete="off" />
+            </div>
+            <span asp-validation-for="Input.RecoveryCode" class="text-danger small"></span>
+        </div>
+
+        <button type="submit" class="btn-primary-lg">Log in</button>
+
+        <p class="note">
+            <a asp-page="./LoginWith2fa" asp-route-returnUrl="@returnUrl" class="link-sm">
+                Back to 2FA code login
+            </a>
+        </p>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

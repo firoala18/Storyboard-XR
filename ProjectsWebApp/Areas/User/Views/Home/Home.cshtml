@@ -1,0 +1,298 @@
+@model (IEnumerable<PortalCard> Cards, PortalVideo Video)
+
+
+@{
+    ViewData["Title"] = "Über StoryBoard";
+    // Make the layout use container-fluid so widths match the navbar
+    ViewBag.FullWidth = true;
+}
+@{
+    int counter = 1; // Initialize a counter for unique IDs
+}
+
+<title>Über StoryBoard</title>
+    <style>
+        /* General Styling */
+        body {
+            /*    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 0;
+                    background: #f4f4f4;
+                    color: #333; */
+                   
+        }
+
+        /* Video Section Styling */
+        .video-container {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            height: 300px;
+            border-radius: 15px;
+            margin: 0;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            margin-top: 20px;
+        }
+
+            .video-container video {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform: translate(-50%, -50%);
+            }
+
+        /* Card Styling */
+        .card-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin: 2rem 0;
+            padding: 0;
+            max-width: 100%;
+        }
+
+        .card {
+            /* background: linear-gradient(145deg, #ffffff, #e6e6e6); */
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            overflow: hidden;
+            position: relative;
+        }
+
+            .card:hover {
+                transform: translateY(-8px);
+                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            }
+
+        .card-title {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #222;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+            .card-title:after {
+                content: "";
+                display: block;
+                width: 50px;
+                height: 4px;
+            background: #89ba17;
+                margin-top: 8px;
+                border-radius: 2px;
+            }
+
+        .card-content {
+            display: -webkit-box;
+            -webkit-line-clamp: 5; /* Limit to 4 lines initially */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-height: 7.2em; /* Approximate height for 4 lines */
+            transition: max-height 0.3s ease-out;
+        }
+
+
+            .card-content.expanded {
+                -webkit-line-clamp: unset; /* Remove the line limit */
+                max-height: none; /* Allow full content to show */
+                overflow: visible;
+            }
+
+
+        .read-more, .read-less {
+        color: #89ba17;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            font-size: 1rem;
+            display: inline-block;
+            margin-top: 10px;
+            transition: color 0.3s;
+        }
+
+            .read-more:hover, .read-less:hover {
+            color: #89ba17;
+            }
+
+        .d-none {
+            display: none;
+        }
+
+        /* Accordion Animation */
+        .expand-animation {
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out;
+        }
+
+            .expand-animation.hidden {
+                max-height: 0;
+                opacity: 0;
+            }
+
+            .expand-animation.visible {
+                max-height: 500px;
+                opacity: 1;
+            }
+
+        /* Responsive adjustments */
+        @@media (max-width: 768px) {
+            .video-container {
+                height: 300px;
+                margin: 1rem 0;
+                border-radius: 10px;
+            }
+
+            .card {
+                width: 100%;
+            }
+        }
+
+    /* Responsive Media Wrapper -------------------------------------------- */
+    .media-box {
+        position: relative;
+        width: 100%;
+        margin: 20px 0 0;
+        max-height:500px;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(0,0,0,.2);
+        aspect-ratio: 16/9; /* moderne Browser */
+    }
+
+        /* Fallback für sehr alte Browser ohne aspect-ratio */
+        .media-box::before {
+            content: "";
+            display: block;
+            padding-top: 56.25%; /* 16:9 */
+        }
+
+        .media-box > img,
+        .media-box > video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* oder 'contain', wenn nichts beschnitten werden soll */
+        }
+
+    /* Mobile Feinjustierung */
+    @@media (max-width:768px) {
+        .media-box
+
+    {
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    }
+
+    }
+
+    /* (deine Karten-Stile bleiben) */
+    .card-container { max-width: 100%; }
+   
+    </style>
+
+
+    <!-- Video Section -->
+@if (Model.Video?.ShowImageInsteadOfVideo == true && !string.IsNullOrEmpty(Model.Video?.ImagePath))
+{
+    <div class="media-box">
+        <img src="@Url.Content(Model.Video.ImagePath.StartsWith("/") ? "~" + Model.Video.ImagePath : Model.Video.ImagePath)" alt="Portal Banner">
+    </div>
+}
+else
+{
+    <div class="media-box">
+        <video autoplay muted loop playsinline>
+            <source src="@Url.Content(((Model.Video?.VideoPath ?? string.Empty).StartsWith("/")) ? ("~" + Model.Video.VideoPath) : Model.Video?.VideoPath)" type="video/mp4" />
+            Ihr Browser unterstützt dieses Video nicht.
+        </video>
+    </div>
+}
+
+
+
+    <!-- Card Section -->
+    <div class="card-container">
+
+        @foreach (var card in Model.Cards.OrderBy(p => p.DisplayOrder))
+        {
+            <div class="card">
+                <div class="card-title">@card.Title</div>
+                <div class="card-content" id="content-@counter">
+                @Html.Raw(card.Content)
+                </div>
+                <a class="read-more" data-id="@counter">(mehr anzeigen)</a>
+                <a class="read-less d-none" data-id="@counter">(weniger anzeigen)</a>
+            </div>
+            counter++; // Increment the counter for the next card
+        }
+
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const readMoreLinks = document.querySelectorAll('.read-more');
+            const readLessLinks = document.querySelectorAll('.read-less');
+
+            function toggleContent(id, isExpand) {
+                const content = document.getElementById(`content-${id}`);
+                const readMore = document.querySelector(`.read-more[data-id="${id}"]`);
+                const readLess = document.querySelector(`.read-less[data-id="${id}"]`);
+
+                if (content && readMore && readLess) {
+                    if (isExpand) {
+                        content.classList.add('expanded');
+                        readMore.classList.add('d-none');
+                        readLess.classList.remove('d-none');
+                    } else {
+                        content.classList.remove('expanded');
+                        readLess.classList.add('d-none');
+                        readMore.classList.remove('d-none');
+                    }
+                }
+            }
+
+            function checkContentHeight() {
+                readMoreLinks.forEach(link => {
+                    const id = link.getAttribute('data-id');
+                    const content = document.getElementById(`content-${id}`);
+
+                    if (content) {
+                        // Check if content height exceeds 3 lines
+                        const isOverflowing = content.scrollHeight > content.offsetHeight;
+
+                        // Hide "Read More" if content does not overflow
+                        if (!isOverflowing) {
+                            link.classList.add('d-none');
+                        }
+                    }
+                });
+            }
+
+            readMoreLinks.forEach(link => {
+                link.addEventListener('click', function () {
+                    const id = this.getAttribute('data-id');
+                    toggleContent(id, true);
+                });
+            });
+
+            readLessLinks.forEach(link => {
+                link.addEventListener('click', function () {
+                    const id = this.getAttribute('data-id');
+                    toggleContent(id, false);
+                });
+            });
+
+            // Initial check for content height
+            checkContentHeight();
+        });
+
+    </script>

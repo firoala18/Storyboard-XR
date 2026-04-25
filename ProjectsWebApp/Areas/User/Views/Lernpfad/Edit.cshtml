@@ -1,0 +1,128 @@
+@model ProjectsWebApp.Models.LernFlow
+@{
+    ViewData["Title"] = $"Lernpfad bearbeiten: {Model.Title}";
+
+    var slug = Model.PublicId;
+}
+
+<link rel="stylesheet" href="~/css/lernpfad.css" />
+
+<div class="lp-hero no-bg py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-12 col-lg-8">
+                <div class="glass-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h3 class="mb-0">Lernpfad bearbeiten</h3>
+                        <a class="btn btn-outline-dark" href="lp/@slug">Abbrechen</a>
+                    </div>
+
+                    <form id="editFlowForm" method="post" action="lp/@slug/edit" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label">Titel</label>
+                            <input class="form-control form-control-lg" name="title" value="@Model.Title" required />
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Beschreibung (optional)</label>
+                            <textarea class="form-control richtext" rows="3" name="description">@Model.Description</textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Bild (optional)</label>
+                            <input type="file" class="form-control" name="flowImage" accept="image/*" />
+                            @if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+                            {
+                                <div class="mt-2">
+                                    <img src="@Model.ImagePath" alt="Aktuelles Bild" style="max-width: 200px; border-radius: 8px;" />
+                                </div>
+                            }
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Schritte</h6>
+                            <button type="button" class="btn btn-sm btn-dark" id="addEditStepBtn"><i class="bi bi-plus-lg me-1"></i>Schritt hinzufügen</button>
+                        </div>
+
+                        <ul class="list-group" id="editStepList">
+                            @foreach (var s in (Model.Steps ?? new List<ProjectsWebApp.Models.LernStep>()).OrderBy(x => x.Order).ThenBy(x => x.Id))
+                            {
+                                <li class="list-group-item">
+                                    <div class="d-flex align-items-start gap-2">
+                                        <span class="drag-handle mt-1"><i class="bi bi-grip-vertical"></i></span>
+                                        <div class="flex-grow-1">
+                                            <input type="hidden" name="stepIds[]" value="@s.Id" />
+                                            <input type="hidden" class="step-order" name="stepOrders[]" value="@s.Order" />
+                                            <label class="form-label">Titel</label>
+                                            <input class="form-control mb-2" name="stepTitles[]" placeholder="Schritt Titel" value="@s.Title" />
+                                            <label class="form-label">Beschreibung (optional)</label>
+                                            <textarea class="form-control richtext" rows="2" name="stepDescriptions[]" placeholder="Schritt Beschreibung (optional)">@s.Description</textarea>
+                                            <label class="form-label mt-3">Bild (optional)</label>
+                                            <input type="file" class="form-control mt-2 step-image" name="stepImages[]" accept="image/*" />
+                                            @if (!string.IsNullOrWhiteSpace(s.ImagePath))
+                                            {
+                                                <div class="mt-2">
+                                                    <img src="@s.ImagePath" alt="Schrittbild" style="max-width: 160px; border-radius: 6px;" />
+                                                </div>
+                                            }
+                                        </div>
+                                        <button type="button" class="btn btn-outline-danger btn-sm ms-2 remove-step"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-2"></i>Speichern</button>
+                            <a class="btn btn-outline-secondary" href="lp/@slug">Zurück</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="glass-card p-4">
+                    <h6>Aktionen</h6>
+                    <form method="post" action="lp/@slug/delete" onsubmit="return confirm('Diesen Lernpfad wirklich löschen?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-danger w-100"><i class="bi bi-trash me-2"></i>Löschen</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
+    <script>
+        (function(){
+            window._smEditors = window._smEditors || [];
+            window.initRichText = function(el){
+                if(!el || !window.jQuery) return;
+                var $el = window.jQuery(el);
+                try {
+                  $el.summernote({
+                    height: 200,
+                    placeholder: el.getAttribute('placeholder') || '',
+                    toolbar: [
+                      ['style', ['bold','italic','underline','clear']],
+                      ['font', ['fontsize','color']],
+                      ['para', ['ul','ol','paragraph']],
+                      ['insert', ['picture','video','link']],
+                      ['view', ['codeview']]
+                    ]
+                  });
+                  window._smEditors.push({ el: el, $: $el });
+                } catch(err){ console && console.warn && console.warn('Summernote init failed', err); }
+            };
+            window.syncRichText = function(){
+                (window._smEditors || []).forEach(function(p){ try{ p.el.value = p.$.summernote('code'); } catch(e){} });
+            };
+            document.addEventListener('DOMContentLoaded', function(){
+                document.querySelectorAll('textarea.richtext').forEach(function(t){ window.initRichText(t); });
+            });
+        })();
+    </script>
+    <script src="~/js/lernpfad.js"></script>
+}

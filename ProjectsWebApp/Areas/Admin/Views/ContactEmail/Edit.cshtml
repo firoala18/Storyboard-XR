@@ -1,0 +1,30 @@
+﻿@model ContactEmail
+
+@{
+    ViewData["Title"] = "Kontakt-E-Mail-Managment";
+}
+
+<h2 class="mb-4">Kontakt-E-Mail bearbeiten</h2>
+
+<form method="post">
+    <input type="hidden" asp-for="Id" />
+
+    <div class="form-group mb-3">
+        <label asp-for="Email" class="form-label"><strong>E-Mail-Adresse</strong></label>
+        <input asp-for="Email" class="form-control" placeholder="kontakt@example.com" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+
+    <div class="d-flex justify-content-end mt-3">
+      @*   <a asp-action="Index" class="btn btn-secondary">
+            Abbrechen
+        </a> *@
+        <button type="submit" class="btn " style="background:black; color:white">
+            <i class="bi bi-check-lg me-1"></i>Speichern
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

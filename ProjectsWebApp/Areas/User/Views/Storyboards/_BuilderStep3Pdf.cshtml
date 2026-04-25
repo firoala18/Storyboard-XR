@@ -1,0 +1,314 @@
+@model ProjectsWebApp.Models.Storyboard
+@{
+    var hasScenes = Model.Scenes?.Any() == true;
+    var viewerUrl = Url.Action("Viewer", "Storyboards", new { area = "User", id = Model.Id });
+    var promptListUrl = Url.Action("PromptList", "Storyboards", new { area = "User", id = Model.Id });
+    var reflexionUrl = Url.Action("ReflexionList", "Storyboards", new { area = "User", id = Model.Id });
+    // Share link matches what the recipient actually gets: the read-only
+    // Viewer when collab-edit is off, the Builder when it's on.
+    var publicViewerUrl = Model.AllowSharedEditing
+        ? Url.Action("OpenBySlug", "PublicStoryboards", new { area = "User", slug = Model.PublicId })
+        : Url.Action("ViewBySlug", "PublicStoryboards", new { area = "User", slug = Model.PublicId });
+    var isOwner = ViewBag.IsOwner as bool? ?? false;
+    var ownerIsAuthenticated = !string.IsNullOrWhiteSpace(Model.OwnerId);
+}
+
+<div class="step3 @(hasScenes ? "" : "is-empty")">
+    <div class="step3-empty">
+        <h2>Noch keine Szenen</h2>
+        <p>Füge zuerst mindestens eine Szene in Schritt 2 hinzu.</p>
+        <button type="button" class="btn-primary-green" data-goto-step="2">Zurück zu Schritt 2</button>
+    </div>
+
+    <section class="step3-preview">
+        <div class="field-label">Vorschau</div>
+        @if (hasScenes)
+        {
+            @await Html.PartialAsync("~/Areas/User/Views/Storyboards/_ScenePreview.cshtml", Model)
+        }
+    </section>
+
+    <aside class="step3-side">
+        <div class="step3-card">
+            <div class="field-label">📄 PDF Export</div>
+            <a class="btn-primary-green" href="@viewerUrl" target="_blank" rel="noopener">PDF im Viewer erzeugen</a>
+            <p class="step3-help">Der Viewer öffnet in einem neuen Tab. Dort findest du den PDF-Export-Button (A4 Querformat mit Cover, Szenen, Markern &amp; Lizenz).</p>
+        </div>
+
+        <div class="step3-card">
+            <div class="field-label">📝 Text-Exporte</div>
+            <a class="step3-link" href="@promptListUrl" target="_blank" rel="noopener">💡 Prompt-Liste öffnen →</a>
+            <a class="step3-link" href="@reflexionUrl" target="_blank" rel="noopener">🪞 Reflexions-Liste öffnen →</a>
+        </div>
+
+        <div class="step3-card">
+            <div class="field-label">🔗 Teilen</div>
+            <input type="text" readonly class="step3-share-url" value="@publicViewerUrl" />
+            <div class="step3-share-actions">
+                <button type="button" class="btn-secondary" data-action="copy-share" @(!Model.IsShared ? "disabled" : "")>📋 Kopieren</button>
+                <a class="btn-secondary @(!Model.IsShared ? "is-disabled" : "")"
+                   href="@publicViewerUrl" target="_blank" rel="noopener"
+                   @(!Model.IsShared ? "aria-disabled=true tabindex=-1" : "")>🌐 Viewer</a>
+            </div>
+
+            @if (isOwner)
+            {
+                <label class="step3-share-toggle">
+                    <input type="checkbox"
+                           class="js-is-shared-toggle"
+                           @(Model.IsShared ? "checked" : "") />
+                    <span>Teilen aktivieren (andere können ansehen)</span>
+                </label>
+
+                <label class="step3-share-toggle">
+                    <input type="checkbox"
+                           class="js-allow-edit-toggle"
+                           @(Model.AllowSharedEditing ? "checked" : "")
+                           @(Model.IsShared ? "" : "disabled") />
+                    <span>Gemeinsam bearbeiten erlauben</span>
+                </label>
+
+                <p class="step3-help">
+                    @if (!Model.IsShared)
+                    {
+                        <text>Nur Sie selbst sehen dieses Storyboard. Aktivieren Sie Teilen, damit andere über den Link darauf zugreifen können.</text>
+                    }
+                    else if (Model.AllowSharedEditing)
+                    {
+                        <text>Personen mit dem Link können live mitbearbeiten (Live-Sync via SignalR).</text>
+                    }
+                    else
+                    {
+                        <text>Personen mit dem Link können das Storyboard ansehen. Für gemeinsames Bearbeiten zusätzlich die zweite Option aktivieren.</text>
+                    }
+                    @if (ownerIsAuthenticated)
+                    {
+                        <br />
+                        <em>Da Sie angemeldet sind, müssen sich Mitbearbeitende ebenfalls anmelden.</em>
+                    }
+                </p>
+            }
+        </div>
+    </aside>
+</div>
+
+<script>
+(function(){
+    document.querySelector('[data-action="copy-share"]')?.addEventListener('click', async () => {
+        const input = document.querySelector('.step3-share-url');
+        if (!input) return;
+        const href = new URL(input.value, window.location.origin).href;
+        try {
+            await navigator.clipboard.writeText(href);
+            window.Builder?.setChip('saved', 'Link kopiert');
+        } catch {
+            input.select(); document.execCommand('copy');
+        }
+    });
+
+    const sbIdForToggles = document.querySelector('.builder-main')?.dataset.storyboardId;
+
+    async function patchShareFlags(body, chipMsg, rollback) {
+        try {
+            const res = await fetch(window.apiUrl(`/Storyboards/${sbIdForToggles}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) { rollback(); window.Builder?.setChip('error', 'Änderung fehlgeschlagen'); return; }
+            window.Builder?.setChip('saved', chipMsg);
+            // SignalR bundle is only rendered server-side when AllowSharedEditing
+            // is true, so a reload ensures it attaches/detaches cleanly. Also
+            // applies to IsShared since gating Viewer/Builder routes on it
+            // means the viewer card buttons should update.
+            setTimeout(() => location.reload(), 400);
+        } catch { rollback(); window.Builder?.setChip('error', 'Änderung fehlgeschlagen'); }
+    }
+
+    const isSharedToggle = document.querySelector('.js-is-shared-toggle');
+    const allowEditToggle = document.querySelector('.js-allow-edit-toggle');
+
+    isSharedToggle?.addEventListener('change', () => {
+        const enabled = isSharedToggle.checked;
+        isSharedToggle.disabled = true;
+        // Turning sharing off cascades: collab-edit must also be off.
+        const body = enabled
+            ? { isShared: true }
+            : { isShared: false, allowSharedEditing: false };
+        patchShareFlags(body, enabled ? 'Teilen aktiviert…' : 'Teilen deaktiviert…',
+            () => { isSharedToggle.checked = !enabled; isSharedToggle.disabled = false; });
+    });
+
+    allowEditToggle?.addEventListener('change', () => {
+        const enabled = allowEditToggle.checked;
+        if (enabled && !isSharedToggle?.checked) {
+            // Should be prevented by the disabled attribute, but guard anyway.
+            allowEditToggle.checked = false;
+            window.Builder?.setChip('error', 'Bitte zuerst „Teilen aktivieren"');
+            return;
+        }
+        allowEditToggle.disabled = true;
+        patchShareFlags({ allowSharedEditing: enabled },
+            enabled ? 'Mitbearbeiten aktiviert…' : 'Mitbearbeiten deaktiviert…',
+            () => { allowEditToggle.checked = !enabled; allowEditToggle.disabled = false; });
+    });
+    document.querySelectorAll('[data-goto-step]').forEach(b =>
+        b.addEventListener('click', () => window.Builder.gotoStep(Number(b.dataset.gotoStep))));
+
+    // Rebuild the preview with fresh data whenever Step 3 is entered,
+    // so marker positions edited in Step 2 are reflected immediately.
+    const sbId = document.querySelector('.builder-main')?.dataset.storyboardId;
+
+    function buildPreview(data) {
+        const host = document.querySelector('.step3-preview');
+        if (!host) return;
+        // Keep the heading label, replace the inner .scene-preview
+        const existing = host.querySelector('.scene-preview');
+        if (existing) existing.remove();
+
+        const root = document.createElement('div');
+        root.className = 'scene-preview';
+        root.tabIndex = 0;
+
+        // Empty scenes (no image, no name, no markers) are work-in-progress drafts
+        // that clutter the carousel and the exported PDF — hide them here. They
+        // stay visible in Step 2 so authors can still fill them in.
+        const scenes = (data.scenes || []).filter(s =>
+            !!s.imagePath || (s.name && s.name.trim()) || (s.markers && s.markers.length > 0)
+        );
+        if (scenes.length === 0) {
+            root.innerHTML = '<div class="scene-preview-empty">Noch keine Szenen mit Inhalt.</div>';
+            host.appendChild(root);
+            return;
+        }
+
+        const stage = document.createElement('div');
+        stage.className = 'scene-preview-stage';
+        const frame = document.createElement('div');
+        frame.className = 'scene-preview-frame';
+
+        scenes.forEach((sc, i) => {
+            const slide = document.createElement('figure');
+            slide.className = 'scene-preview-slide';
+            slide.dataset.index = String(i);
+            slide.dataset.sceneId = String(sc.id);
+            if (i === 0) slide.setAttribute('data-active', '');
+
+            // Image + markers live in an aspect-ratio box so marker %s are
+            // anchored to the image rect, not the letterboxed slide.
+            const box = document.createElement('div');
+            box.className = 'scene-preview-image-box';
+
+            if (sc.imagePath) {
+                const img = document.createElement('img');
+                img.src = sc.imagePath;
+                img.alt = sc.name || ('Szene ' + sc.number);
+                img.loading = 'lazy';
+                img.addEventListener('load', () => {
+                    if (img.naturalWidth && img.naturalHeight) {
+                        box.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight;
+                    }
+                }, { once: true });
+                if (img.complete && img.naturalWidth && img.naturalHeight) {
+                    box.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight;
+                }
+                box.appendChild(img);
+            } else {
+                const ph = document.createElement('div');
+                ph.className = 'scene-preview-placeholder';
+                ph.textContent = 'Kein Bild';
+                box.appendChild(ph);
+            }
+
+            (sc.markers || []).forEach(m => {
+                const dot = document.createElement('span');
+                dot.className = 'scene-preview-marker';
+                dot.style.left = (m.x * 100) + '%';
+                dot.style.top  = (m.y * 100) + '%';
+                dot.style.background = m.colorHex || '#ef4444';
+                dot.title = m.description || '';
+                dot.textContent = m.number;
+                box.appendChild(dot);
+            });
+
+            slide.appendChild(box);
+
+            const cap = document.createElement('figcaption');
+            cap.className = 'scene-preview-caption';
+            cap.innerHTML = `<span class="scene-preview-num">${sc.number}</span><span class="scene-preview-name">${sc.name ? sc.name.replace(/</g,'&lt;') : ''}</span>`;
+            slide.appendChild(cap);
+            frame.appendChild(slide);
+        });
+
+        const prev = document.createElement('button');
+        prev.type = 'button'; prev.className = 'scene-preview-nav scene-preview-prev';
+        prev.setAttribute('aria-label', 'Vorherige Szene'); prev.textContent = '‹';
+        const next = document.createElement('button');
+        next.type = 'button'; next.className = 'scene-preview-nav scene-preview-next';
+        next.setAttribute('aria-label', 'Nächste Szene'); next.textContent = '›';
+
+        stage.append(prev, frame, next);
+        root.appendChild(stage);
+
+        const pager = document.createElement('div');
+        pager.className = 'scene-preview-pager';
+        pager.setAttribute('role', 'tablist');
+        scenes.forEach((_, i) => {
+            const dot = document.createElement('button');
+            dot.type = 'button'; dot.className = 'scene-preview-dot';
+            dot.dataset.index = String(i);
+            dot.setAttribute('aria-label', 'Szene ' + (i + 1));
+            pager.appendChild(dot);
+        });
+        root.appendChild(pager);
+        host.appendChild(root);
+
+        // Wire navigation
+        const slides = Array.from(root.querySelectorAll('.scene-preview-slide'));
+        const dots   = Array.from(root.querySelectorAll('.scene-preview-dot'));
+        let idx = 0;
+        function show(n) {
+            idx = (n + slides.length) % slides.length;
+            slides.forEach((s, i) => s.toggleAttribute('data-active', i === idx));
+            dots.forEach((d, i) => d.setAttribute('aria-selected', i === idx ? 'true' : 'false'));
+        }
+        prev.addEventListener('click', () => show(idx - 1));
+        next.addEventListener('click', () => show(idx + 1));
+        dots.forEach(d => d.addEventListener('click', () => show(Number(d.dataset.index))));
+        root.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft')  { show(idx - 1); e.preventDefault(); }
+            if (e.key === 'ArrowRight') { show(idx + 1); e.preventDefault(); }
+        });
+        show(0);
+    }
+
+    async function refreshPreview() {
+        if (!sbId) return;
+        try {
+            const res = await fetch(window.apiUrl(`/Storyboards/${sbId}/ScenesJson`));
+            if (!res.ok) return;
+            const data = await res.json();
+            buildPreview(data);
+            // Toggle empty state vs. preview layout. Use the same content filter
+            // as the preview above so "hat 1 Szene aber leer" counts as empty.
+            const step3 = document.querySelector('.step3');
+            if (step3) {
+                const filledScenes = (data.scenes || []).filter(s =>
+                    !!s.imagePath || (s.name && s.name.trim()) || (s.markers && s.markers.length > 0)
+                );
+                step3.classList.toggle('is-empty', filledScenes.length === 0);
+            }
+        } catch (err) {
+            console.warn('Step 3 refresh failed', err);
+        }
+    }
+
+    window.addEventListener('builder:step-changed', (ev) => {
+        if (ev.detail.step === 3) refreshPreview();
+    });
+
+    // Initial step-change fires before this script runs; if we land on step 3
+    // directly via ?step=3, refresh once on load.
+    if (new URLSearchParams(location.search).get('step') === '3') refreshPreview();
+})();
+</script>

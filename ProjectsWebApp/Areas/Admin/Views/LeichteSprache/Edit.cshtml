@@ -1,0 +1,48 @@
+﻿@model LeichteSpracheContent
+
+@{
+    ViewData["Title"] = "Leichte Sprache-Managment";
+}
+
+<h2 class="mb-4">Leichte Sprache bearbeiten</h2>
+
+
+<form method="post">
+    <input type="hidden" asp-for="Id" />
+
+    <div class="form-group mb-3">
+        <label for="Content" class="form-label"><strong>Inhalt</strong></label>
+        <textarea id="Content" asp-for="ContentHtml" class="form-control" rows="10">@Model.ContentHtml</textarea>
+    </div>
+
+  @*   <button type="submit" class="btn mt-3" style="background:black;color:white;">
+        <i class="fas fa-save"></i> Speichern
+    </button>
+    <a href="@Url.Action("Index", "Dashboard", new { area = "Admin" })" class="btn btn-secondary mt-3">
+        <i class="fas fa-arrow-left"></i> Abbrechen
+    </a> *@
+
+    <div class="d-flex justify-content-end mt-3 gap-2 flex-wrap mb-3">
+        @* <a asp-action="Index" class="btn btn-secondary">Abbrechen</a> *@
+        <button type="submit" class="btn  me-2" style="color:white;background:black;"> <i class="bi bi-check-lg me-1"></i> Speichern</button>
+
+        <div/>
+</form>
+
+@section Scripts {
+    <script src="https://cdn.ckeditor.com/4.16.2/standard/ckeditor.js"></script>
+    <script>
+        ClassicEditor
+            .create(document.querySelector('#Content'), {
+                toolbar: [
+                    'bold', 'italic', 'underline', 'strikethrough', '|',
+                    'fontColor', 'fontBackgroundColor', '|',
+                    'link', 'blockQuote', 'bulletedList', 'numberedList', '|',
+                    'insertTable', 'undo', 'redo'
+                ],
+            })
+            .catch(error => {
+                console.error('Error initializing CKEditor:', error);
+            });
+    </script>
+}

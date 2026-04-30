@@ -108,10 +108,16 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 // ─────────── Antiforgery (unique + scoped) ───────────
+// Cookie.Path must be a real path, not empty. Empty string serializes as
+// "Path=" which browsers treat as the request URI's default-path — meaning
+// a token cookie set on /s/my would scope to /s and never be sent to a POST
+// at /User/Storyboards/... So when appBasePath is "" (dev), fall back to "/".
+var cookiePath = string.IsNullOrEmpty(appBasePath) ? "/" : appBasePath;
+
 builder.Services.AddAntiforgery(o =>
 {
     o.Cookie.Name = $"{cookiePrefix}.AntiForgery";
-    o.Cookie.Path = appBasePath;
+    o.Cookie.Path = cookiePath;
     o.Cookie.HttpOnly = true;
     o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     o.SuppressXFrameOptionsHeader = false;

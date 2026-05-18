@@ -26,6 +26,11 @@
         </button>
     </nav>
 
+    @if (Model.AllowSharedEditing)
+    {
+        <div id="presence-bar" class="presence-bar is-empty" aria-label="Aktive Mitbearbeiter"></div>
+    }
+
     <div class="builder-save-chip" data-state="idle" aria-live="polite">
         <span class="builder-save-dot"></span>
         <span class="builder-save-text">Bereit</span>

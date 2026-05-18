@@ -74,33 +74,8 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 .Include(s => s.Storyboard)
                 .FirstOrDefaultAsync(s => s.Id == sceneId);
             if (scene == null) return NotFound();
-
-            // Authorization: only owner (login), anon owner cookie, or valid edit cookie may write
-            var canWrite = false;
-            var uid = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrWhiteSpace(scene.Storyboard?.OwnerId) && uid == scene.Storyboard.OwnerId)
-            {
-                canWrite = true;
-            }
-            else if (!string.IsNullOrWhiteSpace(scene.Storyboard?.OwnerTokenHash)
-                     && Request.Cookies.TryGetValue("sb_uid", out var anonTok)
-                     && !string.IsNullOrWhiteSpace(anonTok))
-            {
-                var anonHash = System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(anonTok))).ToLowerInvariant();
-                if (string.Equals(anonHash, scene.Storyboard!.OwnerTokenHash, System.StringComparison.OrdinalIgnoreCase))
-                    canWrite = true;
-            }
-            if (!canWrite && !string.IsNullOrWhiteSpace(scene.Storyboard?.PublicId))
-            {
-                var slug = scene.Storyboard.PublicId;
-                if (Request.Cookies.TryGetValue($"sbedit_{slug}", out var editPlain) && !string.IsNullOrWhiteSpace(editPlain))
-                {
-                    var editHash = System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(editPlain))).ToLowerInvariant();
-                    if (string.Equals(editHash, scene.Storyboard!.EditKeyHash, System.StringComparison.OrdinalIgnoreCase))
-                        canWrite = true;
-                }
-            }
-            if (!canWrite) return Forbid();
+            if (scene.Storyboard == null) return NotFound();
+            if (!CanWrite(scene.Storyboard)) return Forbid();
 
             var nextNumber = await _context.Markers
                                    .Where(m => m.SceneId == sceneId)
@@ -167,34 +142,8 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 .ThenInclude(sc => sc.Storyboard)
                 .FirstOrDefaultAsync(x => x.Id == id && x.SceneId == sceneId);
             if (m == null) return NotFound();
-
-            // Authorization check against owning storyboard
-            var canWrite = false;
-            var sb = m.Scene?.Storyboard;
-            var uid = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrWhiteSpace(sb?.OwnerId) && uid == sb.OwnerId)
-            {
-                canWrite = true;
-            }
-            else if (!string.IsNullOrWhiteSpace(sb?.OwnerTokenHash)
-                     && Request.Cookies.TryGetValue("sb_uid", out var anonTok)
-                     && !string.IsNullOrWhiteSpace(anonTok))
-            {
-                var anonHash = System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(anonTok))).ToLowerInvariant();
-                if (string.Equals(anonHash, sb!.OwnerTokenHash, System.StringComparison.OrdinalIgnoreCase))
-                    canWrite = true;
-            }
-            if (!canWrite && !string.IsNullOrWhiteSpace(sb?.PublicId))
-            {
-                var slug = sb.PublicId;
-                if (Request.Cookies.TryGetValue($"sbedit_{slug}", out var editPlain) && !string.IsNullOrWhiteSpace(editPlain))
-                {
-                    var editHash = System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(editPlain))).ToLowerInvariant();
-                    if (string.Equals(editHash, sb!.EditKeyHash, System.StringComparison.OrdinalIgnoreCase))
-                        canWrite = true;
-                }
-            }
-            if (!canWrite) return Forbid();
+            if (m.Scene?.Storyboard == null) return NotFound();
+            if (!CanWrite(m.Scene.Storyboard)) return Forbid();
 
             if (dto.X.HasValue) m.X = Math.Clamp(Math.Round(dto.X.Value, 4), 0, 1);
             if (dto.Y.HasValue) m.Y = Math.Clamp(Math.Round(dto.Y.Value, 4), 0, 1);
@@ -247,34 +196,8 @@ namespace ProjectsWebApp.Areas.User.Controllers
                 .ThenInclude(sc => sc.Storyboard)
                 .FirstOrDefaultAsync(x => x.Id == id && x.SceneId == sceneId);
             if (m == null) return NotFound();
-
-            // Authorization check against owning storyboard
-            var canWrite = false;
-            var sb = m.Scene?.Storyboard;
-            var uid = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrWhiteSpace(sb?.OwnerId) && uid == sb.OwnerId)
-            {
-                canWrite = true;
-            }
-            else if (!string.IsNullOrWhiteSpace(sb?.OwnerTokenHash)
-                     && Request.Cookies.TryGetValue("sb_uid", out var anonTok)
-                     && !string.IsNullOrWhiteSpace(anonTok))
-            {
-                var anonHash = System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(anonTok))).ToLowerInvariant();
-                if (string.Equals(anonHash, sb!.OwnerTokenHash, System.StringComparison.OrdinalIgnoreCase))
-                    canWrite = true;
-            }
-            if (!canWrite && !string.IsNullOrWhiteSpace(sb?.PublicId))
-            {
-                var slug = sb.PublicId;
-                if (Request.Cookies.TryGetValue($"sbedit_{slug}", out var editPlain) && !string.IsNullOrWhiteSpace(editPlain))
-                {
-                    var editHash = System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(editPlain))).ToLowerInvariant();
-                    if (string.Equals(editHash, sb!.EditKeyHash, System.StringComparison.OrdinalIgnoreCase))
-                        canWrite = true;
-                }
-            }
-            if (!canWrite) return Forbid();
+            if (m.Scene?.Storyboard == null) return NotFound();
+            if (!CanWrite(m.Scene.Storyboard)) return Forbid();
 
             _context.Markers.Remove(m);
             await _context.SaveChangesAsync();

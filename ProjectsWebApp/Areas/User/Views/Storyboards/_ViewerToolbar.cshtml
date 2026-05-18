@@ -24,6 +24,10 @@
     </a>
     <h1 class="viewer-tb-title" title="@Model.Title">@Model.Title</h1>
     <div class="viewer-tb-actions">
+        @if (Model.AllowSharedEditing)
+        {
+            <div id="presence-bar" class="presence-bar is-empty" aria-label="Aktive Mitbearbeiter"></div>
+        }
         <button type="button" class="viewer-tb-btn" data-action="open-search" aria-label="Suchen" title="Marker suchen (/)">
             <span aria-hidden="true">🔍</span><span class="viewer-tb-label">Suchen</span>
         </button>

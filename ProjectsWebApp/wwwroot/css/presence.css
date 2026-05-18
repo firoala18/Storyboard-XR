@@ -1,0 +1,129 @@
+/* Live presence chips + remote cursor overlay (Builder + Viewer).
+   Loaded only when shared editing is on. */
+
+/* ── Presence bar ─────────────────────────────────────────────
+   Default mode: inline in the header (the header partial provides
+   a placeholder #presence-bar; flex layout aligns it next to the
+   save chip). Floating fallback is used only when no placeholder
+   exists on the page. */
+
+.presence-bar {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    margin: 0 4px;
+    direction: rtl; /* newest chip on the left, overlapping older ones to the right */
+}
+
+.presence-bar > * {
+    direction: ltr;
+    margin-left: -8px; /* overlap */
+}
+
+.presence-bar > *:first-child { margin-left: 0; }
+
+.presence-bar.is-empty { display: none; }
+
+.presence-bar--floating {
+    position: fixed;
+    top: 60px;
+    right: 18px;
+    z-index: 50;
+}
+
+.presence-chip {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .18);
+    color: #fff;
+    font: 600 10px/1 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: .02em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: transform .12s ease, z-index 0s;
+    position: relative;
+    z-index: 1;
+}
+
+.presence-chip:hover {
+    transform: translateY(-1px) scale(1.08);
+    z-index: 2;
+}
+
+.presence-chip:focus-visible {
+    outline: 2px solid #1f2937;
+    outline-offset: 2px;
+}
+
+/* ── Cursor overlay ───────────────────────────────────────────
+   Fixed full-viewport pointer-events:none layer. Each cursor is a
+   small filled arrow with a colored name pill, like Miro / Figma. */
+
+.presence-cursor-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 60;
+    overflow: hidden;
+}
+
+.presence-cursor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    will-change: transform, opacity;
+    transition: transform .08s linear, opacity .25s ease;
+    pointer-events: none;
+    /* Cursor "hot spot" should sit at the translated origin (top-left).
+       The SVG below is drawn so its tip is roughly at (5, 4). Nudge so
+       the tip matches the actual cursor coordinate. */
+}
+
+.presence-cursor-arrow {
+    display: block;
+    margin: -2px 0 0 -2px;
+    filter: drop-shadow(0 1px 1.5px rgba(15, 23, 42, .35));
+}
+
+.presence-cursor-label {
+    position: absolute;
+    top: 16px;
+    left: 14px;
+    color: #fff;
+    font: 600 10.5px/1.1 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    padding: 3px 8px 3px 7px;
+    border-radius: 999px;
+    white-space: nowrap;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .25);
+    letter-spacing: .01em;
+}
+
+/* ── Toast (used when click-to-jump can't resolve) ─────────── */
+
+.presence-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #fff;
+    color: #111827;
+    padding: 10px 14px;
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .15);
+    border-left: 4px solid #888;
+    font: 500 13px/1.3 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    z-index: 100;
+    animation: presence-toast-in .18s ease-out;
+}
+
+@keyframes presence-toast-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}

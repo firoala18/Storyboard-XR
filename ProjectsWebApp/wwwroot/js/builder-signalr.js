@@ -14,6 +14,15 @@
         .withAutomaticReconnect()
         .build();
 
+    // Share the connection so sibling modules (e.g. builder-presence.js) can
+    // reuse a single socket instead of opening a second one.
+    window.BuilderRT = {
+        connection,
+        storyboardId,
+        ready: false,
+        role: 'editor', // Builder is only rendered for owner / shared editors
+    };
+
     let joinedSceneId = null;
 
     async function joinScene(id) {
@@ -136,6 +145,8 @@
             await connection.invoke('JoinStoryboard', storyboardId);
             const active = window.Step2?.getActiveSceneId();
             if (active) await joinScene(active);
+            window.BuilderRT.ready = true;
+            window.dispatchEvent(new CustomEvent('builder-rt:ready'));
         } catch (err) {
             console.warn('SignalR connection failed', err);
         }

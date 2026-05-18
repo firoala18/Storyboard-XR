@@ -5,6 +5,11 @@
     ViewBag.FullWidth = true;
 }
 
+@if (Model.AllowSharedEditing)
+{
+    <link rel="stylesheet" href="~/css/presence.css" asp-append-version="true" />
+}
+
 @await Html.PartialAsync("~/Areas/User/Views/Storyboards/_BuilderTimeline.cshtml", Model)
 
 <main class="builder-main" data-storyboard-id="@Model.Id"
@@ -39,5 +44,6 @@
     {
         <script defer src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@7.0.5/dist/browser/signalr.min.js"></script>
         <script defer src="~/js/builder-signalr.js" asp-append-version="true"></script>
+        <script defer src="~/js/builder-presence.js" asp-append-version="true"></script>
     }
 }

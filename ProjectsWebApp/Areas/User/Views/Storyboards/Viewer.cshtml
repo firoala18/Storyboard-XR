@@ -65,6 +65,10 @@
 }
 
 <link rel="stylesheet" href="~/css/viewer.css" />
+@if (Model.AllowSharedEditing)
+{
+    <link rel="stylesheet" href="~/css/presence.css" asp-append-version="true" />
+}
 
 @if (!scenes.Any())
 {
@@ -143,5 +147,10 @@ else
         <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
         <script src="~/js/viewer.js"></script>
         <script src="~/js/viewer-markers.js"></script>
+        @if (Model.AllowSharedEditing)
+        {
+            <script defer src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@7.0.5/dist/browser/signalr.min.js"></script>
+            <script defer src="~/js/builder-presence.js" asp-append-version="true"></script>
+        }
     }
 }

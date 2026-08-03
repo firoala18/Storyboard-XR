@@ -24,3 +24,8 @@ ProjectsWebApp/wwwroot/uploads/
 .env
 .claude/scheduled_tasks.lock
 
+
+# Secrets & local tooling — never commit
+ProjectsWebApp/appsettings.production.json
+appsettings.*.local.json
+.claude/
